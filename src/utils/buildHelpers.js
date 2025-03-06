@@ -3,11 +3,11 @@
 import { getRandomElement, compareAllCharmCombinations } from "../functions/buildAlgorithm";
 
 // Group armors by category ('t')
-export function groupArmors(armors) {
+export function groupArmors(armors, armorRankLimit) {
   return armors.reduce((acc, piece) => {
     const category = piece.t;
     if (!acc[category]) acc[category] = [];
-    acc[category].push(piece);
+    if (piece.r <= armorRankLimit)acc[category].push(piece);
     return acc;
   }, {});
 }
@@ -52,8 +52,8 @@ export function filterCharmsBySkills(charms, targetSkills) {
 }
 
 // Wrap all helper functions and run the charm-combination algorithm.
-export function buildArmorSet(armors, charms, targetSkills, algorithmOptions) {
-  const groupedArmors = groupArmors(armors);
+export function buildArmorSet(armors, charms, targetSkills, armorRankLimit, algorithmOptions) {
+  const groupedArmors = groupArmors(armors, armorRankLimit);
   const filteredGroupedArmors = filterArmorsBySkills(groupedArmors, targetSkills);
   const randomSet = createRandomSet(filteredGroupedArmors, groupedArmors);
   const filteredCharms = filterCharmsBySkills(charms, targetSkills);

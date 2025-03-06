@@ -85,20 +85,40 @@ class ArmorDetail extends React.Component {
         <div style={styles.header}>
           <div style={styles.imageAndName}>
             <img src={imageUrl} alt={translatedName} style={styles.armorImage} />
-            <h2 style={styles.armorName}>{translatedName}</h2>
+            {editMode ?
+              <div>
+                <select defaultValue={armor.id} onChange={this.handleSelectChange} style={styles.select}>
+                  {availableArmors.map((a) => {
+                    const base = a.n.replace(/α|β/g, "");
+                    const suf = a.n.match(/α|β/) ? a.n.match(/α|β/)[0] : "";
+                    const translated = (translationMap[base] || base) + suf;
+                    return (
+                      <option key={a.id} value={a.id}>
+                        {translated}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div> : <h2 style={styles.armorName}>{translatedName}</h2>
+            }
           </div>
           <button style={styles.toggleButton} onClick={this.toggleStats} aria-expanded={showStats}>
             {showStats ? "Hide" : "?"}
           </button>
-          {/* New Edit button */}
-          <button style={styles.editButton} onClick={() => this.setState({ editMode: true })}>
-            Edit
-          </button>
+          {
+            editMode ?
+              <button style={styles.editButton} onClick={() => this.setState({ editMode: false })}>
+                Cancel
+              </button> :
+              <button style={styles.editButton} onClick={() => this.setState({ editMode: true })}>
+                Edit
+              </button>
+          }
         </div>
-        <p style={styles.armorType}>類型: {armorType}</p>
         <p style={styles.slots}>{this.renderSlots(armor.s)}</p>
         {showStats && (
           <div style={styles.stats}>
+            <p style={styles.armorType}>類型: {armorType}</p>
             <p>防御力 (DF): {armor.stats.df}</p>
             <p>火耐性 (F): {armor.stats.f}</p>
             <p>水耐性 (W): {armor.stats.w}</p>
@@ -121,27 +141,13 @@ class ArmorDetail extends React.Component {
             <p style={styles.noSkillText}>無技能</p>
           )}
         </div>
-        {editMode && (
-          <div style={styles.editContainer}>
-            <select defaultValue={armor.id} onChange={this.handleSelectChange}>
-              {availableArmors.map((a) => {
-                const base = a.n.replace(/α|β/g, "");
-                const suf = a.n.match(/α|β/) ? a.n.match(/α|β/)[0] : "";
-                const translated = (translationMap[base] || base) + suf;
-                return (
-                  <option key={a.id} value={a.id}>
-                    {translated}
-                  </option>
-                );
-              })}
-            </select>
-            <button onClick={() => this.setState({ editMode: false })}>Cancel</button>
-          </div>
-        )}
       </div>
     );
   }
 }
+
+const DARK_BACKGROUND = "#2c2c2c";
+const BORDER_COLOR = "#555";
 
 const styles = {
   armorCard: {
@@ -232,9 +238,13 @@ const styles = {
     padding: 0,
     margin: "8px 0 0 0",
   },
-  editContainer: {
-    marginTop: "12px",
-  },
+  select: {
+    backgroundColor: DARK_BACKGROUND,
+    padding: '8px',
+    color: "#fff",
+    borderRadius: '5px',
+    border: `1px solid ${BORDER_COLOR}`, // Optional: Add border for better visibility
+  }
 };
 
 export default ArmorDetail;

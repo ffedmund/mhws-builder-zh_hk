@@ -117,12 +117,11 @@ class SkillSelector extends React.Component {
 
     // Build a comma-separated string of selected skill names/levels for the collapsed view
     const selectedSkillsText = Object.entries(selectedLevels)
-      .filter(([, lvl]) => lvl > 0)
-      .map(([id, lvl]) => {
-        const skill = skillDatas.find((s) => s.id === id);
-        return skill ? `${skill.n}(Lv.${lvl})` : `SkillID ${id}(Lv.${lvl})`;
-      })
-      .join(", ");
+    .filter(([, lvl]) => lvl > 0)
+    .map(([id, lvl]) => {
+      const skill = skillDatas.find((s) => s.id === id);
+      return skill ? `${skill.n}(Lv.${lvl})` : `SkillID ${id}(Lv.${lvl})`;
+    });
 
     return (
       <div style={styles.container}>
@@ -131,9 +130,20 @@ class SkillSelector extends React.Component {
         {/* Collapsed view */}
         {!expanded && (
           <div style={styles.collapsedDisplay}>
-            <div style={styles.selectedText}>
-              {selectedSkillsText || "請選擇技能..."}
-            </div>
+            {/* Step 2: Render as a list */}
+            <ul style={styles.selectedSkillList}> {/* Added ul and style */}
+              {selectedSkillsText.length > 0 ? ( // Check if there are selected skills
+                selectedSkillsText.map((skillText, index) => ( // Map through the array
+                  <li key={index} style={styles.selectedSkillListItem}> {/* Added li and style, using index as key for now */}
+                    {skillText}
+                  </li>
+                ))
+              ) : (
+                <li style={styles.selectedSkillListItem}> {/* Added li and style for placeholder */}
+                  請選擇技能...
+                </li>
+              )}
+            </ul>
             <div style={styles.collapsedButtons}>
               <button style={styles.resetButton} onClick={this.handleReset}>
                 重置
@@ -205,170 +215,179 @@ class SkillSelector extends React.Component {
 
 // Inline styles (adapt as needed)
 const styles = {
-    container: {
-      width: "100%", // Full width on small screens
-      maxWidth: "600px", // Max width on larger screens
-      backgroundColor: "#3a3a3a",
-      color: "#d8c7a1",
-      border: "1px solid #666",
-      borderRadius: "6px",
-      padding: "16px",
-      fontFamily: "sans-serif",
-      margin: "16px auto", // Center on larger screens
-      boxSizing: "border-box", // Include padding and border in width
-    },
-    title: {
-      fontSize: "1.2rem",
-      fontWeight: "bold",
-      marginBottom: "8px",
-    },
-    collapsedDisplay: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      border: "1px solid #555",
-      borderRadius: "4px",
-      padding: "8px",
-      backgroundColor: "#2c2c2c",
-    },
-    selectedText: {
-      flex: 1,
-      marginRight: "8px",
-      fontSize: "0.95rem",
-      color: "#d8c7a1",
-      whiteSpace: "nowrap",      // Prevent text wrapping
-      overflow: "hidden",        // Hide overflow
-      textOverflow: "ellipsis",  // Show ellipsis for overflow
-    },
-    collapsedButtons: {
-      display: "flex",
-      gap: "8px",
-      alignItems: "center",
-    },
-    resetButton: {
-      backgroundColor: "#5c5c5c",
-      color: "#fff",
-      border: "none",
-      padding: "4px 8px",
-      borderRadius: "4px",
-      cursor: "pointer",
-      whiteSpace: "nowrap", // Prevent button text wrapping
-    },
-    plusSign: {
-      fontSize: "1.5rem",
-      fontWeight: "bold",
-      backgroundColor: "#52452f",
-      color: "#fff",
-      width: "24px",
-      height: "24px",
-      borderRadius: "4px",
-      textAlign: "center",
-      lineHeight: "24px",
-      cursor: "pointer",
-      border: "none", // Remove default button border
-      padding: 0, // Remove default button padding
-      display: 'flex', // Use flex to easily center content
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    panel: {
-      backgroundColor: "#2c2c2c",
-      border: "1px solid #555",
-      borderRadius: "4px",
-      padding: "8px",
-      marginTop: "8px",
-    },
-    instructions: {
-      fontSize: "0.85rem",
-      lineHeight: "1.4",
-      backgroundColor: "#3a3a3a",
-      padding: "8px",
-      borderRadius: "4px",
-      marginBottom: "8px",
-    },
-    tabContainer: {
-      display: "flex",
-      marginBottom: "8px",
-    },
-    tab: {
-      flex: 1,
-      padding: "8px",
-      textAlign: "center",
-      backgroundColor: "#444",
-      marginRight: "4px",
-      borderRadius: "4px",
-      cursor: "pointer",
-      border: "none", // Remove default button styles
-      color: "#fff",  // Ensure text is visible
-      transition: "background-color 0.2s", // Smooth transition
-  
-      '&:hover': {  // Hover effect
-          backgroundColor: "#555",
-      }
-    },
-    tabActive: {
-      backgroundColor: "#52452f",
-      border: "1px solid #aaa", // Keep border for active tab
-    },
-    searchBox: {
-      marginBottom: "8px",
-    },
-    searchInput: {
-      width: "100%",
-      padding: "6px",
-      border: "1px solid #555",
-      borderRadius: "4px",
-      backgroundColor: "#2c2c2c",
-      color: "#d8c7a1",
-      boxSizing: "border-box", // Include padding in width
-    },
-    listContainer: {
-      height: "200px",
-      overflowY: "auto",
-      border: "1px solid #555",
-      borderRadius: "4px",
-      padding: "4px",
-      backgroundColor: "#2c2c2c",
-    },
-    skillList: {
-      listStyleType: "none",
-      padding: 0,
-      margin: 0,
-    },
-    skillRow: {
-      display: "flex",
-      alignItems: "center",
-      padding: "6px",
-      borderBottom: "1px solid #444",
-    },
-    skillName: {
-      flex: 1,
-      wordBreak: "break-word", // Wrap long skill names
-    },
-    skillLevel: {
-      marginLeft: "8px",
-    },
-    select: {
-      backgroundColor: "#3a3a3a",
-      color: "#d8c7a1",
-      border: "1px solid #555",
-      borderRadius: "4px",
-      padding: "2px 4px",
-    },
-    confirmButtonContainer: {
-      marginTop: "8px",
-      display: "flex",
-      justifyContent: "center",
-    },
-    button: {
-      backgroundColor: "#5c5c5c",
-      color: "#fff",
-      border: "none",
-      padding: "6px 12px",
-      borderRadius: "4px",
-      cursor: "pointer",
-    },
-  };
+  container: {
+    width: "100%", // Full width on small screens
+    maxWidth: "600px", // Max width on larger screens
+    backgroundColor: "#3a3a3a",
+    color: "#d8c7a1",
+    border: "1px solid #666",
+    borderRadius: "6px",
+    padding: "16px",
+    fontFamily: "sans-serif",
+    margin: "16px auto", // Center on larger screens
+    boxSizing: "border-box", // Include padding and border in width
+  },
+  title: {
+    fontSize: "1.2rem",
+    fontWeight: "bold",
+    marginBottom: "8px",
+  },
+  collapsedDisplay: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    border: "1px solid #555",
+    borderRadius: "4px",
+    padding: "8px",
+    backgroundColor: "#2c2c2c",
+  },
+  selectedText: {
+    flex: 1,
+    marginRight: "8px",
+    fontSize: "0.95rem",
+    color: "#d8c7a1",
+    whiteSpace: "nowrap",      // Prevent text wrapping
+    overflow: "hidden",        // Hide overflow
+    textOverflow: "ellipsis",  // Show ellipsis for overflow
+  },
+  selectedSkillList: { // Style for the ul
+    listStyleType: 'none', // Remove bullet points
+    padding: 0,
+    margin: 0,
+  },
+  selectedSkillListItem: { // Style for each li
+    marginBottom: '5px', // Add some spacing between list items
+    fontSize: '0.9em', // Adjust font size if needed
+  },
+  collapsedButtons: {
+    display: "flex",
+    gap: "8px",
+    alignItems: "center",
+  },
+  resetButton: {
+    backgroundColor: "#5c5c5c",
+    color: "#fff",
+    border: "none",
+    padding: "4px 8px",
+    borderRadius: "4px",
+    cursor: "pointer",
+    whiteSpace: "nowrap", // Prevent button text wrapping
+  },
+  plusSign: {
+    fontSize: "1.5rem",
+    fontWeight: "bold",
+    backgroundColor: "#52452f",
+    color: "#fff",
+    width: "24px",
+    height: "24px",
+    borderRadius: "4px",
+    textAlign: "center",
+    lineHeight: "24px",
+    cursor: "pointer",
+    border: "none", // Remove default button border
+    padding: 0, // Remove default button padding
+    display: 'flex', // Use flex to easily center content
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  panel: {
+    backgroundColor: "#2c2c2c",
+    border: "1px solid #555",
+    borderRadius: "4px",
+    padding: "8px",
+    marginTop: "8px",
+  },
+  instructions: {
+    fontSize: "0.85rem",
+    lineHeight: "1.4",
+    backgroundColor: "#3a3a3a",
+    padding: "8px",
+    borderRadius: "4px",
+    marginBottom: "8px",
+  },
+  tabContainer: {
+    display: "flex",
+    marginBottom: "8px",
+  },
+  tab: {
+    flex: 1,
+    padding: "8px",
+    textAlign: "center",
+    backgroundColor: "#444",
+    marginRight: "4px",
+    borderRadius: "4px",
+    cursor: "pointer",
+    border: "none", // Remove default button styles
+    color: "#fff",  // Ensure text is visible
+    transition: "background-color 0.2s", // Smooth transition
+
+    '&:hover': {  // Hover effect
+      backgroundColor: "#555",
+    }
+  },
+  tabActive: {
+    backgroundColor: "#52452f",
+    border: "1px solid #aaa", // Keep border for active tab
+  },
+  searchBox: {
+    marginBottom: "8px",
+  },
+  searchInput: {
+    width: "100%",
+    padding: "6px",
+    border: "1px solid #555",
+    borderRadius: "4px",
+    backgroundColor: "#2c2c2c",
+    color: "#d8c7a1",
+    boxSizing: "border-box", // Include padding in width
+  },
+  listContainer: {
+    height: "200px",
+    overflowY: "auto",
+    border: "1px solid #555",
+    borderRadius: "4px",
+    padding: "4px",
+    backgroundColor: "#2c2c2c",
+  },
+  skillList: {
+    listStyleType: "none",
+    padding: 0,
+    margin: 0,
+  },
+  skillRow: {
+    display: "flex",
+    alignItems: "center",
+    padding: "6px",
+    borderBottom: "1px solid #444",
+  },
+  skillName: {
+    flex: 1,
+    wordBreak: "break-word", // Wrap long skill names
+  },
+  skillLevel: {
+    marginLeft: "8px",
+  },
+  select: {
+    backgroundColor: "#3a3a3a",
+    color: "#d8c7a1",
+    border: "1px solid #555",
+    borderRadius: "4px",
+    padding: "2px 4px",
+  },
+  confirmButtonContainer: {
+    marginTop: "8px",
+    display: "flex",
+    justifyContent: "center",
+  },
+  button: {
+    backgroundColor: "#5c5c5c",
+    color: "#fff",
+    border: "none",
+    padding: "6px 12px",
+    borderRadius: "4px",
+    cursor: "pointer",
+  },
+};
 
 export default SkillSelector;
 

@@ -1,4 +1,5 @@
 import React from "react";
+import html2canvas from 'html2canvas';
 import SkillSelector from "./components/skillSelectorModal";
 import ArmorDetail from "./components/armorDetail";
 import CharmDetail from "./components/charmDetail";
@@ -16,7 +17,10 @@ class App extends React.Component {
       bestCurrentSkills: null,
       searchIterations: 1,
       isLoading: false, // Add isLoading state
+      armorRankLimit: 8,
     };
+    this.armorListRef = React.createRef(); // Create a ref for armorList
+    this.currentSkillsRef = React.createRef(); // Create a ref for currentSkills
   }
 
   handleSkillConfirm = (selectedSkillsArray) => {
@@ -29,7 +33,7 @@ class App extends React.Component {
 
   handleBuild = async () => {
     // Use async/await
-    const { targetSkills, searchIterations } = this.state;
+    const { targetSkills, searchIterations, armorRankLimit } = this.state;
     if (Object.keys(targetSkills).length === 0) {
       alert("請先選擇目標技能");
       return;
@@ -57,6 +61,7 @@ class App extends React.Component {
               armors,
               charms,
               targetSkills,
+              armorRankLimit,
               algorithmOptions
             );
 
@@ -95,7 +100,7 @@ class App extends React.Component {
     if (skillEntries.length === 0) return null;
 
     return (
-      <div style={styles.currentSkillsContainer}>
+      <div style={styles.currentSkillsContainer} ref={this.currentSkillsRef}> {/* Attach ref here */}
         <h3 style={styles.currentSkillsTitle}>當前技能</h3>
         <ul style={styles.currentSkillsList}>
           {skillEntries.map(([skillId, level]) => {
@@ -112,6 +117,23 @@ class App extends React.Component {
     );
   }
 
+  calculateCurrentSkills = (armorCombination) => {
+    if (!armorCombination || !Array.isArray(armorCombination)) {
+      return {};
+    }
+    const currentSkills = {};
+    armorCombination.forEach(piece => {
+      if (piece && piece.sks) {
+        piece.sks.forEach(skill => {
+          const { id: skillId, lv: level } = skill;
+          currentSkills[skillId] = (currentSkills[skillId] || 0) + level;
+        });
+      }
+    });
+    return currentSkills;
+  }
+
+
   handleEditArmor = (index, newArmorId) => {
     const { bestArmorCombination } = this.state;
     // Ensure we have a valid armor piece (not editing the charm)
@@ -121,9 +143,69 @@ class App extends React.Component {
     if (updatedArmor) {
       const newCombination = [...bestArmorCombination];
       newCombination[index] = updatedArmor;
-      this.setState({ bestArmorCombination: newCombination });
+
+      // Recalculate current skills based on the new combination
+      const updatedCurrentSkills = this.calculateCurrentSkills(newCombination);
+
+      this.setState({
+        bestArmorCombination: newCombination,
+        bestCurrentSkills: updatedCurrentSkills
+      });
     }
   };
+
+  handleRankLimitChange = (event) => {
+    this.setState({ armorRankLimit: parseInt(event.target.value, 10) });
+  };
+
+  handleSaveImage = async () => {
+    if (!this.armorListRef.current || !this.currentSkillsRef.current) {
+      return; // Exit if refs are not yet attached
+    }
+
+    const armorListElement = this.armorListRef.current;
+    const currentSkillsElement = this.currentSkillsRef.current;
+
+    try {
+      const armorListCanvas = await html2canvas(armorListElement, { backgroundColor: null }); // Make background transparent
+      const currentSkillsCanvas = await html2canvas(currentSkillsElement, { backgroundColor: null }); // Make background transparent
+
+      // Create a single canvas to merge both with black background
+      const combinedCanvas = document.createElement('canvas');
+      const combinedContext = combinedCanvas.getContext('2d');
+
+      // Padding for black background
+      const padding = 20;
+      const spacing = 20;
+
+      // Calculate combined canvas dimensions
+      const totalHeight = armorListCanvas.height + currentSkillsCanvas.height + spacing + 2 * padding;
+      const maxWidth = Math.max(armorListCanvas.width, currentSkillsCanvas.width) + 2 * padding;
+      combinedCanvas.width = maxWidth;
+      combinedCanvas.height = totalHeight;
+
+      // Fill background with black
+      combinedContext.fillStyle = 'black';
+      combinedContext.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+
+      // Draw armorListCanvas and currentSkillsCanvas on top of black background
+      combinedContext.drawImage(armorListCanvas, padding, padding);
+      combinedContext.drawImage(currentSkillsCanvas, padding, armorListCanvas.height + spacing + padding);
+
+
+      const dataURL = combinedCanvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = dataURL;
+      downloadLink.download = 'armor_skills_setup.png'; // Filename for download
+      document.body.appendChild(downloadLink); // Required for Firefox to work correctly
+      downloadLink.click();
+      document.body.removeChild(downloadLink); // Clean up the appended link
+    } catch (error) {
+      console.error("Error capturing image:", error);
+      alert("Failed to save image. Please check the console for details.");
+    }
+  };
+
 
   render() {
     const {
@@ -131,25 +213,45 @@ class App extends React.Component {
       bestFitness,
       searchIterations,
       isLoading,
+      armorRankLimit
     } = this.state;
+    const rankOptions = [];
+    for (let lvl = 1; lvl <= 8; lvl++) {
+      rankOptions.push(
+        <option key={lvl} value={lvl}>
+          {lvl}
+        </option>
+      );
+    }
     return (
       <div style={styles.appContainer}>
         <h1 style={styles.title}>魔物獵人荒野 - 配裝器</h1>
         <div style={styles.controlsContainer}>
           <SkillSelector onConfirm={this.handleSkillConfirm} />
-          <div style={styles.sliderContainer}>
-            <label htmlFor="searchIterations" style={styles.sliderLabel}>
-              搜索次數: {searchIterations}
-            </label>
-            <input
-              type="range"
-              id="searchIterations"
-              min="1"
-              max="10"
-              value={searchIterations}
-              onChange={this.handleSliderChange}
-              style={styles.slider}
-            />
+          <div style={styles.inputGroup}>
+            <div style={styles.inputLabel}>搜索次數:</div>
+            <div style={styles.sliderContainer}>
+              <input
+                type="range"
+                id="searchIterations"
+                min="1"
+                max="10"
+                value={searchIterations}
+                onChange={this.handleSliderChange}
+                style={styles.slider}
+              />
+              <span style={styles.sliderValue}>{searchIterations}</span>
+            </div>
+          </div>
+          <div style={styles.inputGroup}>
+            <div style={styles.inputLabel}>裝備最高等級</div>
+            <select
+              style={styles.select}
+              value={armorRankLimit} // Use armorRankLimit from state
+              onChange={this.handleRankLimitChange} // Add onChange handler
+            >
+              {rankOptions}
+            </select>
           </div>
           <button
             style={styles.buildButton}
@@ -158,6 +260,15 @@ class App extends React.Component {
           >
             {isLoading ? "Loading..." : "Build"}
           </button>
+          {bestArmorCombination && ( // Conditionally render Save button
+            <button
+              style={styles.saveButton}
+              onClick={this.handleSaveImage}
+              disabled={isLoading}
+            >
+              Save
+            </button>
+          )}
         </div>
         {bestArmorCombination && (
           <div style={styles.resultContainer}>
@@ -165,7 +276,7 @@ class App extends React.Component {
               推薦裝備組合{" "}
               <span style={styles.fitness}>(Fitness: {bestFitness})</span>
             </h2>
-            <div style={styles.armorList}>
+            <div style={styles.armorList} ref={this.armorListRef}> {/* Attach ref here */}
               {Array.isArray(bestArmorCombination) ? (
                 bestArmorCombination.map((piece, index) => {
                   if (!piece) return null;
@@ -200,10 +311,20 @@ class App extends React.Component {
   }
 }
 
+// Define style variables for consistency
+const DARK_BACKGROUND = "#2c2c2c";
+const MID_BACKGROUND = "#3a3a3a";
+const LIGHT_TEXT = "#d8c7a1";
+const WHITE_TEXT = '#fff';
+const BUTTON_BACKGROUND = "#52452f";
+const SAVE_BACKGROUND = "#918877";
+const BORDER_COLOR = "#555";
+const INPUT_GREY_BACKGROUND = '#3a3a3a';
+
 const styles = {
   appContainer: {
-    backgroundColor: "#2c2c2c",
-    color: "#d8c7a1",
+    backgroundColor: DARK_BACKGROUND,
+    color: LIGHT_TEXT,
     minHeight: "100vh",
     padding: "20px",
     fontFamily: "sans-serif",
@@ -225,24 +346,42 @@ const styles = {
     width: "100%",
     maxWidth: "600px",
     marginBottom: "20px",
+    boxSizing: 'border-box',
   },
-  sliderContainer: {
+  inputGroup: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
     width: "100%",
     marginBottom: "10px",
+    backgroundColor: INPUT_GREY_BACKGROUND,
+    padding: '10px',
+    borderRadius: '5px',
+    boxSizing: 'border-box',
   },
-  sliderLabel: {
-    display: "block",
-    marginBottom: "5px",
-    textAlign: "center",
-    color: "#fff",
+  inputLabel: {
+    marginRight: "10px",
+    color: WHITE_TEXT,
+  },
+  sliderContainer: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
   },
   slider: {
     width: "100%",
     cursor: "pointer",
+    flex: 1,
+  },
+  sliderValue: {
+    color: WHITE_TEXT,
+    marginLeft: '5px',
+    minWidth: '25px',
+    textAlign: 'center',
   },
   buildButton: {
-    backgroundColor: "#52452f",
-    color: "#fff",
+    backgroundColor: BUTTON_BACKGROUND,
+    color: WHITE_TEXT,
     border: "none",
     padding: "10px 20px",
     borderRadius: "6px",
@@ -251,12 +390,25 @@ const styles = {
     marginTop: "16px",
     width: "100%",
     maxWidth: "600px",
-    transition: "background-color 0.3s ease", // Smooth transition for hover
+    transition: "background-color 0.3s ease",
+  },
+  saveButton: {
+    backgroundColor: SAVE_BACKGROUND,
+    color: WHITE_TEXT,
+    border: "none",
+    padding: "10px 20px",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "1rem",
+    marginTop: "16px",
+    width: "100%",
+    maxWidth: "600px",
+    transition: "background-color 0.3s ease",
   },
   resultContainer: {
-    marginTop: "30px",
-    backgroundColor: "#3a3a3a",
-    border: "1px solid #444",
+    marginTop: "25px",
+    backgroundColor: MID_BACKGROUND,
+    border: `1px solid ${BORDER_COLOR}`,
     borderRadius: "8px",
     padding: "16px",
     width: "100%",
@@ -268,7 +420,7 @@ const styles = {
   },
   fitness: {
     fontSize: "1rem",
-    color: "#fff",
+    color: WHITE_TEXT,
   },
   armorList: {
     display: "flex",
@@ -277,14 +429,14 @@ const styles = {
     marginBottom: "20px",
   },
   card: {
-    backgroundColor: "#2c2c2c",
-    border: "1px solid #555",
+    backgroundColor: DARK_BACKGROUND,
+    border: `1px solid ${BORDER_COLOR}`,
     borderRadius: "6px",
     padding: "8px",
   },
   currentSkillsContainer: {
-    backgroundColor: "#2c2c2c",
-    border: "1px solid #555",
+    backgroundColor: DARK_BACKGROUND,
+    border: `1px solid ${BORDER_COLOR}`,
     borderRadius: "6px",
     padding: "10px",
   },
@@ -300,6 +452,14 @@ const styles = {
   currentSkillItem: {
     marginBottom: "4px",
   },
+  select: {
+    width: "150px", // Wider width for select box
+    backgroundColor: DARK_BACKGROUND,
+    color: LIGHT_TEXT,
+    padding: '8px',
+    borderRadius: '5px',
+    border: `1px solid ${BORDER_COLOR}`, // Optional: Add border for better visibility
+  }
 };
 
 export default App;
