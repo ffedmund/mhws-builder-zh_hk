@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/mhws-builder-zh_hk/static/css/main.e6c13ad2.css",
+    "main.js": "/mhws-builder-zh_hk/static/js/main.4f39762e.js",
+    "static/js/453.26a2753d.chunk.js": "/mhws-builder-zh_hk/static/js/453.26a2753d.chunk.js",
+    "index.html": "/mhws-builder-zh_hk/index.html",
+    "main.e6c13ad2.css.map": "/mhws-builder-zh_hk/static/css/main.e6c13ad2.css.map",
+    "main.4f39762e.js.map": "/mhws-builder-zh_hk/static/js/main.4f39762e.js.map",
+    "453.26a2753d.chunk.js.map": "/mhws-builder-zh_hk/static/js/453.26a2753d.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.4f39762e.js"
+  ]
+}
