@@ -10,6 +10,7 @@ class ArmorDetail extends React.Component {
     this.state = {
       armor: null,
       showStats: false,
+      editMode: false, // new state for edit mode
     };
   }
 
@@ -48,7 +49,14 @@ class ArmorDetail extends React.Component {
     this.setState((prevState) => ({ showStats: !prevState.showStats }));
   };
 
-  // Function to format the slots
+  handleSelectChange = (event) => {
+    const newArmorId = event.target.value;
+    if (this.props.onEditArmor && typeof this.props.index !== "undefined") {
+      this.props.onEditArmor(this.props.index, newArmorId);
+    }
+    this.setState({ editMode: false });
+  };
+
   renderSlots(slots) {
     if (!slots || slots.length === 0) {
       return "槽位: 無";
@@ -58,7 +66,7 @@ class ArmorDetail extends React.Component {
   }
 
   render() {
-    const { armor, showStats } = this.state;
+    const { armor, showStats, editMode } = this.state;
     if (!armor) {
       return <div>Armor not found for id: {this.props.armorId}</div>;
     }
@@ -69,6 +77,9 @@ class ArmorDetail extends React.Component {
     const translatedName = (translationMap[baseName] || baseName) + suffix;
     const imageUrl = `https://mhwilds.com/images/armour2/b${armor.t}-${armor.r}.png`;
 
+    // For the edit dropdown, filter available armors of the same type.
+    const availableArmors = armors.filter((a) => a.t === armor.t);
+
     return (
       <div style={styles.armorCard}>
         <div style={styles.header}>
@@ -78,6 +89,10 @@ class ArmorDetail extends React.Component {
           </div>
           <button style={styles.toggleButton} onClick={this.toggleStats} aria-expanded={showStats}>
             {showStats ? "Hide" : "?"}
+          </button>
+          {/* New Edit button */}
+          <button style={styles.editButton} onClick={() => this.setState({ editMode: true })}>
+            Edit
           </button>
         </div>
         <p style={styles.armorType}>類型: {armorType}</p>
@@ -93,25 +108,36 @@ class ArmorDetail extends React.Component {
           </div>
         )}
         <div style={styles.skills}>
-          <strong style={styles.skillTitle}>技能:</strong> {/* Added skillTitle style */}
+          <strong style={styles.skillTitle}>技能:</strong>
           {armor.sks && armor.sks.length > 0 ? (
             <ul style={styles.skillList}>
               {armor.sks.map((sk) => {
                 const skillData = this.findSkillById(sk.id);
                 if (!skillData) return null;
-                return (
-                  <SkillItem
-                    key={sk.id}
-                    skillData={skillData}
-                    level={sk.lv}
-                  />
-                );
+                return <SkillItem key={sk.id} skillData={skillData} level={sk.lv} />;
               })}
             </ul>
           ) : (
-            <p style={styles.noSkillText}>無技能</p> // Added noSkillText Style
+            <p style={styles.noSkillText}>無技能</p>
           )}
         </div>
+        {editMode && (
+          <div style={styles.editContainer}>
+            <select defaultValue={armor.id} onChange={this.handleSelectChange}>
+              {availableArmors.map((a) => {
+                const base = a.n.replace(/α|β/g, "");
+                const suf = a.n.match(/α|β/) ? a.n.match(/α|β/)[0] : "";
+                const translated = (translationMap[base] || base) + suf;
+                return (
+                  <option key={a.id} value={a.id}>
+                    {translated}
+                  </option>
+                );
+              })}
+            </select>
+            <button onClick={() => this.setState({ editMode: false })}>Cancel</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -141,18 +167,28 @@ const styles = {
     color: "#fff",
   },
   armorImage: {
-    width: "30px",       // Adjust as needed
-    height: "30px",      // Adjust as needed
-    marginRight: "10px", // Add some space between the image and the name
-    objectFit: "contain",  // Prevent image distortion
-    flexShrink: 0,     // Prevent the image from shrinking
+    width: "30px",
+    height: "30px",
+    marginRight: "10px",
+    objectFit: "contain",
+    flexShrink: 0,
   },
   imageAndName: {
-    display: "flex",     // Use flexbox
-    alignItems: "center", // Vertically center items
-    flexGrow: 1,          // Allow this container to grow
+    display: "flex",
+    alignItems: "center",
+    flexGrow: 1,
   },
   toggleButton: {
+    cursor: "pointer",
+    fontSize: "1rem",
+    backgroundColor: "#52452f",
+    color: "#fff",
+    padding: "2px 6px",
+    borderRadius: "4px",
+    border: "none",
+    marginRight: "8px",
+  },
+  editButton: {
     cursor: "pointer",
     fontSize: "1rem",
     backgroundColor: "#52452f",
@@ -177,24 +213,27 @@ const styles = {
     color: "#d8c7a1",
   },
   slots: {
-    margin: "4px 0 8px 0", // Add some margin for spacing
-    color: "#bbb",       // Use a slightly lighter text color
-    fontSize: '0.9rem'
+    margin: "4px 0 8px 0",
+    color: "#bbb",
+    fontSize: "0.9rem",
   },
   skills: {
     fontSize: "0.9rem",
   },
-  skillTitle: { // Style for the "技能:" text
-    color: "#fff", // White color
-    marginRight: "8px", // Add some spacing
+  skillTitle: {
+    color: "#fff",
+    marginRight: "8px",
   },
-  noSkillText: { // Style for "無技能"
-    color: "#bbb", // Light gray
+  noSkillText: {
+    color: "#bbb",
   },
   skillList: {
     listStyleType: "none",
     padding: 0,
     margin: "8px 0 0 0",
+  },
+  editContainer: {
+    marginTop: "12px",
   },
 };
 

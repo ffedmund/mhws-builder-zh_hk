@@ -112,19 +112,31 @@ class App extends React.Component {
     );
   }
 
+  handleEditArmor = (index, newArmorId) => {
+    const { bestArmorCombination } = this.state;
+    // Ensure we have a valid armor piece (not editing the charm)
+    if (!bestArmorCombination || index < 0 || index >= bestArmorCombination.length - 1) return;
+
+    const updatedArmor = armors.find((a) => a.id === newArmorId);
+    if (updatedArmor) {
+      const newCombination = [...bestArmorCombination];
+      newCombination[index] = updatedArmor;
+      this.setState({ bestArmorCombination: newCombination });
+    }
+  };
+
   render() {
     const {
       bestArmorCombination,
       bestFitness,
       searchIterations,
       isLoading,
-    } = this.state; // Get isLoading from state
+    } = this.state;
     return (
       <div style={styles.appContainer}>
         <h1 style={styles.title}>魔物獵人荒野 - 配裝器</h1>
         <div style={styles.controlsContainer}>
           <SkillSelector onConfirm={this.handleSkillConfirm} />
-
           <div style={styles.sliderContainer}>
             <label htmlFor="searchIterations" style={styles.sliderLabel}>
               搜索次數: {searchIterations}
@@ -139,14 +151,12 @@ class App extends React.Component {
               style={styles.slider}
             />
           </div>
-
-          {/* Disable the button while loading */}
           <button
             style={styles.buildButton}
             onClick={this.handleBuild}
             disabled={isLoading}
           >
-            {isLoading ? "Loading..." : "Build"} {/* Change button text */}
+            {isLoading ? "Loading..." : "Build"}
           </button>
         </div>
         {bestArmorCombination && (
@@ -156,28 +166,31 @@ class App extends React.Component {
               <span style={styles.fitness}>(Fitness: {bestFitness})</span>
             </h2>
             <div style={styles.armorList}>
-              {bestArmorCombination && Array.isArray(bestArmorCombination) ? (
-                <div style={styles.armorList}>
-                  {bestArmorCombination.map((piece, index) => {
-                    if (!piece) return null;
-                    if (index === bestArmorCombination.length - 1) {
-                      return (
-                        <div style={styles.card} key={index}>
-                          <CharmDetail charmId={piece.id} />
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div style={styles.card} key={index}>
-                          <ArmorDetail armorId={piece.id} />
-                        </div>
-                      );
-                    }
-                  })}
-                </div>
-              ) : bestArmorCombination ? (
+              {Array.isArray(bestArmorCombination) ? (
+                bestArmorCombination.map((piece, index) => {
+                  if (!piece) return null;
+                  // Assuming the last piece is a charm which is not editable
+                  if (index === bestArmorCombination.length - 1) {
+                    return (
+                      <div style={styles.card} key={index}>
+                        <CharmDetail charmId={piece.id} />
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div style={styles.card} key={index}>
+                        <ArmorDetail
+                          armorId={piece.id}
+                          index={index}
+                          onEditArmor={this.handleEditArmor}
+                        />
+                      </div>
+                    );
+                  }
+                })
+              ) : (
                 <div>Invalid armor combination result.</div>
-              ) : null}
+              )}
             </div>
             {this.renderCurrentSkills()}
           </div>
