@@ -1,0 +1,375 @@
+import React from "react";
+import skillDatas from "../data/cn_skillDatas.json";
+
+class SkillSelector extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      // Controls whether the search panel is expanded
+      expanded: false,
+      // Which tab is active: "a" (armor) or "w" (weapon)
+      activeTab: "a",
+      // Search query for filtering the skill list
+      searchQuery: "",
+      // A map of skillId -> chosen level (0..max)
+      selectedLevels: {}
+    };
+  }
+
+  // Toggle the panel open/close
+  toggleExpand = () => {
+    this.setState((prev) => ({ expanded: !prev.expanded }));
+  };
+
+  // Switch between armor ("a") and weapon ("w") skills
+  handleTabChange = (tab) => {
+    this.setState({ activeTab: tab, searchQuery: "" });
+  };
+
+  // Update the search query
+  handleSearchChange = (e) => {
+    this.setState({ searchQuery: e.target.value });
+  };
+
+  // Reset all selected levels to 0
+  handleReset = () => {
+    this.setState({ selectedLevels: {} });
+  };
+
+  // Confirm selection: pass the chosen skills to parent, if provided
+  handleConfirm = () => {
+    const { selectedLevels } = this.state;
+    // Build an array of { skillId, level } for each skill with level > 0
+    const chosen = Object.entries(selectedLevels)
+      .filter(([, lvl]) => lvl > 0)
+      .map(([skillId, lvl]) => ({ skillId, level: lvl }));
+    if (this.props.onConfirm) {
+      this.props.onConfirm(chosen);
+    }
+  };
+
+  // Confirm & collapse panel
+  handleConfirmAndCollapse = () => {
+    this.handleConfirm();
+    this.toggleExpand();
+  };
+
+  // When user changes the level of a skill
+  handleLevelChange = (skillId, newLevel) => {
+    this.setState((prev) => {
+      const updated = { ...prev.selectedLevels };
+      if (newLevel === 0) {
+        delete updated[skillId];
+      } else {
+        updated[skillId] = newLevel;
+      }
+      return { selectedLevels: updated };
+    });
+  };
+
+  // Render the skill list (filtered by tab and search query)
+  renderSkillList() {
+    const { activeTab, searchQuery, selectedLevels } = this.state;
+    let filtered = skillDatas.filter((skill) => skill.m === activeTab);
+
+    if (searchQuery.trim()) {
+      filtered = filtered.filter((skill) =>
+        skill.n.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return (
+      <ul style={styles.skillList}>
+        {filtered.map((skill) => {
+          const currentLevel = selectedLevels[skill.id] || 0;
+          const levelOptions = [];
+          for (let lvl = 0; lvl <= skill.max; lvl++) {
+            levelOptions.push(
+              <option key={lvl} value={lvl}>
+                {lvl}
+              </option>
+            );
+          }
+
+          return (
+            <li key={skill.id} style={styles.skillRow}>
+              <div style={styles.skillName}>{skill.n}</div>
+              <div style={styles.skillLevel}>
+                <select
+                  style={styles.select}
+                  value={currentLevel}
+                  onChange={(e) =>
+                    this.handleLevelChange(skill.id, parseInt(e.target.value))
+                  }
+                >
+                  {levelOptions}
+                </select>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  render() {
+    const { expanded, activeTab, searchQuery, selectedLevels } = this.state;
+
+    // Build a comma-separated string of selected skill names/levels for the collapsed view
+    const selectedSkillsText = Object.entries(selectedLevels)
+      .filter(([, lvl]) => lvl > 0)
+      .map(([id, lvl]) => {
+        const skill = skillDatas.find((s) => s.id === id);
+        return skill ? `${skill.n}(Lv.${lvl})` : `SkillID ${id}(Lv.${lvl})`;
+      })
+      .join(", ");
+
+    return (
+      <div style={styles.container}>
+        <div style={styles.title}>發動技能</div>
+
+        {/* Collapsed view */}
+        {!expanded && (
+          <div style={styles.collapsedDisplay}>
+            <div style={styles.selectedText}>
+              {selectedSkillsText || "請選擇技能..."}
+            </div>
+            <div style={styles.collapsedButtons}>
+              <button style={styles.resetButton} onClick={this.handleReset}>
+                重置
+              </button>
+              <div style={styles.plusSign} onClick={this.toggleExpand}>
+                +
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Expanded panel */}
+        {expanded && (
+          <div style={styles.panel}>
+            {/* Instructions (optional) */}
+            <div style={styles.instructions}>
+              請選擇要發動的技能或對應套索：
+              <br />
+              配装器將根據選擇的技能与等级，為你生成對應的配装。
+            </div>
+
+            {/* Tabs */}
+            <div style={styles.tabContainer}>
+              <div
+                style={{
+                  ...styles.tab,
+                  ...(activeTab === "a" ? styles.tabActive : {})
+                }}
+                onClick={() => this.handleTabChange("a")}
+              >
+                Armor Skills
+              </div>
+              <div
+                style={{
+                  ...styles.tab,
+                  ...(activeTab === "w" ? styles.tabActive : {})
+                }}
+                onClick={() => this.handleTabChange("w")}
+              >
+                Weapon Skills
+              </div>
+            </div>
+
+            {/* Search box */}
+            <div style={styles.searchBox}>
+              <input
+                style={styles.searchInput}
+                placeholder="搜索技能..."
+                value={searchQuery}
+                onChange={this.handleSearchChange}
+              />
+            </div>
+
+            {/* Skill list */}
+            <div style={styles.listContainer}>{this.renderSkillList()}</div>
+
+            {/* Confirm button at the bottom */}
+            <div style={styles.confirmButtonContainer}>
+              <button style={styles.button} onClick={this.handleConfirmAndCollapse}>
+                Confirm
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+}
+
+// Inline styles (adapt as needed)
+const styles = {
+    container: {
+      width: "100%", // Full width on small screens
+      maxWidth: "600px", // Max width on larger screens
+      backgroundColor: "#3a3a3a",
+      color: "#d8c7a1",
+      border: "1px solid #666",
+      borderRadius: "6px",
+      padding: "16px",
+      fontFamily: "sans-serif",
+      margin: "16px auto", // Center on larger screens
+      boxSizing: "border-box", // Include padding and border in width
+    },
+    title: {
+      fontSize: "1.2rem",
+      fontWeight: "bold",
+      marginBottom: "8px",
+    },
+    collapsedDisplay: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      border: "1px solid #555",
+      borderRadius: "4px",
+      padding: "8px",
+      backgroundColor: "#2c2c2c",
+    },
+    selectedText: {
+      flex: 1,
+      marginRight: "8px",
+      fontSize: "0.95rem",
+      color: "#d8c7a1",
+      whiteSpace: "nowrap",      // Prevent text wrapping
+      overflow: "hidden",        // Hide overflow
+      textOverflow: "ellipsis",  // Show ellipsis for overflow
+    },
+    collapsedButtons: {
+      display: "flex",
+      gap: "8px",
+      alignItems: "center",
+    },
+    resetButton: {
+      backgroundColor: "#5c5c5c",
+      color: "#fff",
+      border: "none",
+      padding: "4px 8px",
+      borderRadius: "4px",
+      cursor: "pointer",
+      whiteSpace: "nowrap", // Prevent button text wrapping
+    },
+    plusSign: {
+      fontSize: "1.5rem",
+      fontWeight: "bold",
+      backgroundColor: "#52452f",
+      color: "#fff",
+      width: "24px",
+      height: "24px",
+      borderRadius: "4px",
+      textAlign: "center",
+      lineHeight: "24px",
+      cursor: "pointer",
+      border: "none", // Remove default button border
+      padding: 0, // Remove default button padding
+      display: 'flex', // Use flex to easily center content
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    panel: {
+      backgroundColor: "#2c2c2c",
+      border: "1px solid #555",
+      borderRadius: "4px",
+      padding: "8px",
+      marginTop: "8px",
+    },
+    instructions: {
+      fontSize: "0.85rem",
+      lineHeight: "1.4",
+      backgroundColor: "#3a3a3a",
+      padding: "8px",
+      borderRadius: "4px",
+      marginBottom: "8px",
+    },
+    tabContainer: {
+      display: "flex",
+      marginBottom: "8px",
+    },
+    tab: {
+      flex: 1,
+      padding: "8px",
+      textAlign: "center",
+      backgroundColor: "#444",
+      marginRight: "4px",
+      borderRadius: "4px",
+      cursor: "pointer",
+      border: "none", // Remove default button styles
+      color: "#fff",  // Ensure text is visible
+      transition: "background-color 0.2s", // Smooth transition
+  
+      '&:hover': {  // Hover effect
+          backgroundColor: "#555",
+      }
+    },
+    tabActive: {
+      backgroundColor: "#52452f",
+      border: "1px solid #aaa", // Keep border for active tab
+    },
+    searchBox: {
+      marginBottom: "8px",
+    },
+    searchInput: {
+      width: "100%",
+      padding: "6px",
+      border: "1px solid #555",
+      borderRadius: "4px",
+      backgroundColor: "#2c2c2c",
+      color: "#d8c7a1",
+      boxSizing: "border-box", // Include padding in width
+    },
+    listContainer: {
+      height: "200px",
+      overflowY: "auto",
+      border: "1px solid #555",
+      borderRadius: "4px",
+      padding: "4px",
+      backgroundColor: "#2c2c2c",
+    },
+    skillList: {
+      listStyleType: "none",
+      padding: 0,
+      margin: 0,
+    },
+    skillRow: {
+      display: "flex",
+      alignItems: "center",
+      padding: "6px",
+      borderBottom: "1px solid #444",
+    },
+    skillName: {
+      flex: 1,
+      wordBreak: "break-word", // Wrap long skill names
+    },
+    skillLevel: {
+      marginLeft: "8px",
+    },
+    select: {
+      backgroundColor: "#3a3a3a",
+      color: "#d8c7a1",
+      border: "1px solid #555",
+      borderRadius: "4px",
+      padding: "2px 4px",
+    },
+    confirmButtonContainer: {
+      marginTop: "8px",
+      display: "flex",
+      justifyContent: "center",
+    },
+    button: {
+      backgroundColor: "#5c5c5c",
+      color: "#fff",
+      border: "none",
+      padding: "6px 12px",
+      borderRadius: "4px",
+      cursor: "pointer",
+    },
+  };
+
+export default SkillSelector;
+
+
