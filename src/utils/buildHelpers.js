@@ -51,18 +51,28 @@ export function filterCharmsBySkills(charms, targetSkills) {
   });
 }
 
+export function filterDecosBySkills(decos, targetSkills) {
+    return decos.filter(deco => {
+      return deco.sks.some(
+        (skill) => targetSkills.hasOwnProperty(skill.id)
+      );
+    });
+  }
+
 // Wrap all helper functions and run the charm-combination algorithm.
-export function buildArmorSet(armors, charms, targetSkills, armorRankLimit, algorithmOptions) {
+export function buildArmorSet(armors, charms, decos, targetSkills, armorRankLimit, algorithmOptions) {
   const groupedArmors = groupArmors(armors, armorRankLimit);
   const filteredGroupedArmors = filterArmorsBySkills(groupedArmors, targetSkills);
   const randomSet = createRandomSet(filteredGroupedArmors, groupedArmors);
   const filteredCharms = filterCharmsBySkills(charms, targetSkills);
+  const filteredDecos = decos? filterDecosBySkills(decos, targetSkills):[];
 
   return compareAllCharmCombinations(
     filteredCharms,
     groupedArmors,
     targetSkills,
     randomSet,
+    filteredDecos,
     algorithmOptions
   );
 }

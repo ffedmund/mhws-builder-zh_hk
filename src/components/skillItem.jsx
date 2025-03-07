@@ -18,7 +18,7 @@ class SkillItem extends React.Component {
 
     return (
       <li style={styles.skillItem} onClick={this.toggleExpand}>
-        <span style={styles.skillHeader}>
+        <span style={level === skillData.max? styles.maxSkillHeader:styles.skillHeader}>
           {skillData.n} (Lv.{level})
         </span>
         {expanded && skillData.tl && skillData.tl[level] && (
@@ -34,20 +34,29 @@ class SkillItem extends React.Component {
 const styles = {
   skillItem: {
     marginBottom: "8px",
-    padding: "4px",
-    backgroundColor: "#372929",
-    border: "1px solid #6B5C5C",
+    padding: "6px", // Reduced padding from 8px to 6px
+    backgroundColor: "rgba(68, 68, 68, 0.8)", // Semi-transparent dark grey background
+    border: "1px solid #555",
     borderRadius: "4px",
     cursor: "pointer"
   },
   skillHeader: {
     display: "block",
     fontWeight: "bold",
-    color: "#DC6558"
+    color: "#fff",
+    fontSize: "1rem",
+    marginBottom: "4px",
+  },
+  maxSkillHeader: {
+    display: "block",
+    fontWeight: "bold",
+    color: "#F28705",
+    fontSize: "1rem",
+    marginBottom: "4px",
   },
   skillDetail: {
     marginTop: "4px",
-    fontSize: "0.85rem",
+    fontSize: "0.9rem",
     color: "#fff"
   }
 };

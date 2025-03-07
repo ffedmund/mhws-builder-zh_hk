@@ -1,8 +1,114 @@
+import skillDatas from '../data/cn_skillDatas.json';
+
 export function getRandomElement(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function calculateFitness(armorSet, charm, targetSkills) {
+// Compute the marginal improvement (delta) of adding a deco.
+function computeDecoImprovement(deco, currentSkills, targetSkills) {
+    const exactBonus = 0.5;
+    const exceedFactor = 1;
+    const notMeetFactor = 5;
+    let delta = 0;
+    deco.sks.forEach(skill => {
+        if (targetSkills.hasOwnProperty(skill.id)) {
+            const t = targetSkills[skill.id];
+            const curr = currentSkills[skill.id] || 0;
+            const newVal = curr + skill.lv;
+            const currContribution = (curr === t)
+                ? t * exactBonus
+                : (curr > t ? - (curr - t) * exceedFactor : - (t - curr) * notMeetFactor);
+            const newContribution = (newVal === t)
+                ? t * exactBonus
+                : (newVal > t ? - (newVal - t) * exceedFactor : - (t - newVal) * notMeetFactor);
+            delta += (newContribution - currContribution);
+        }
+    });
+    return delta;
+}
+
+// Greedily assign decos to available slots.
+// availableSlots: array of slot sizes (from armors).
+// decoOptions: all deco objects available (should be filtered for m === 'a' if needed).
+// aggregatedSkills: skills from charm & armor so far.
+// targetSkills: the target skills that we want to reach.
+function assignDecos(availableSlots, decoOptions, aggregatedSkills, targetSkills) {
+    // Work on a copy of aggregatedSkills so we can simulate adding deco effects.
+    let currentSkills = { ...aggregatedSkills };
+    // For each slot, we store the assigned deco (or null if no beneficial deco found)
+    const assignments = [];
+    
+    availableSlots.forEach(slotSize => {
+        // Get candidate decos that “fit” the slot (assuming the rule: deco.req === slotSize).
+        const candidates = decoOptions.filter(deco => deco.req === slotSize);
+        let bestDeco = null;
+        let bestDelta = 0;
+        candidates.forEach(deco => {
+            const delta = computeDecoImprovement(deco, currentSkills, targetSkills);
+            if (delta > bestDelta) {
+                bestDelta = delta;
+                bestDeco = deco;
+            }
+        });
+        if (bestDeco && bestDelta > 0) {
+            assignments.push(bestDeco);
+            // Update currentSkills with the bonus from the chosen deco.
+            bestDeco.sks.forEach(skill => {
+                if (targetSkills.hasOwnProperty(skill.id)) {
+                    currentSkills[skill.id] = (currentSkills[skill.id] || 0) + skill.lv;
+                }
+            });
+        } else {
+            assignments.push(null);
+        }
+    });
+    return { assignments, updatedSkills: currentSkills };
+}
+
+function assignDecosByArmor(armorSet, decoOptions, aggregatedSkills, targetSkills) {
+    // Work on a copy of aggregatedSkills so we can simulate adding deco effects.
+    let currentSkills = { ...aggregatedSkills };
+
+    // For each armor piece, assign decos for its slots.
+    const groupedAssignments = armorSet.map(piece => {
+        let pieceAssignments = [];
+        if (piece.s && piece.s.length > 0) {
+            piece.s.forEach(slotSize => {
+                // Get candidate decos that fit the slot (assuming deco.req === slotSize)
+                const candidates = decoOptions.filter(deco => deco.req === slotSize);
+                let bestDeco = null;
+                let bestDelta = 0;
+                candidates.forEach(deco => {
+                    const delta = computeDecoImprovement(deco, currentSkills, targetSkills);
+                    if (delta > bestDelta) {
+                        bestDelta = delta;
+                        bestDeco = deco;
+                    }
+                });
+                if (bestDeco && bestDelta > 0) {
+                    pieceAssignments.push(bestDeco);
+                    // Update currentSkills with the bonus from the chosen deco.
+                    bestDeco.sks.forEach(skill => {
+                        if (targetSkills.hasOwnProperty(skill.id)) {
+                            currentSkills[skill.id] = (currentSkills[skill.id] || 0) + skill.lv;
+                        }
+                    });
+                } else {
+                    // No beneficial deco found for this slot.
+                    pieceAssignments.push(null);
+                }
+            });
+        } else {
+            // If the armor piece has no slots, we return an empty array.
+            pieceAssignments = [];
+        }
+        return pieceAssignments;
+    });
+    return { assignments: groupedAssignments, updatedSkills: currentSkills };
+}
+
+// Updated fitness function which now considers deco assignment.
+export function calculateFitness(armorSet, charm, decoOptions, targetSkills) {
     let baseFitness = 0;
     let aggregatedSkills = {};
 
@@ -13,48 +119,59 @@ export function calculateFitness(armorSet, charm, targetSkills) {
         }
     });
 
-    // Process each armor piece: accumulate skills from the sks array and base fitness from s array.
+    // Process each armor piece: accumulate skills and collect available slot sizes.
+    const availableSlots = [];
     armorSet.forEach(piece => {
-        // Aggregate target skills.
         if (piece.sks && piece.sks.length > 0) {
             piece.sks.forEach(skill => {
-                aggregatedSkills[skill.id] = (aggregatedSkills[skill.id] || 0) + skill.lv;
+                if (targetSkills.hasOwnProperty(skill.id)) {
+                    aggregatedSkills[skill.id] = (aggregatedSkills[skill.id] || 0) + skill.lv;
+                }
             });
         }
-
-        // Add bonus from s array.
+        // Collect slots from the armor (each slot represented by its size).
         if (piece.s && piece.s.length > 0) {
+            piece.s.forEach(slotSize => {
+                availableSlots.push(slotSize);
+            });
             const sumS = piece.s.reduce((sum, num) => sum + num, 0);
             baseFitness += sumS * 1.5;
         }
     });
 
-    // If the set does not contain any target skills, apply an extreme penalty.
+    // Incorporate deco assignments.
+    // const decoResult = assignDecos(availableSlots, decoOptions, aggregatedSkills, targetSkills);
+    const decoResult = assignDecosByArmor(armorSet, decoOptions, aggregatedSkills, targetSkills);
+    // Update aggregated skills with deco contributions.
+    aggregatedSkills = decoResult.updatedSkills;
+
+    // If no target skills are present, apply an extreme penalty.
     if (Object.keys(aggregatedSkills).length === 0) {
-        return { fitness: -1e9, currentSkills: aggregatedSkills };
+        return { fitness: -1e9, currentSkills: aggregatedSkills, decoAssignment: decoResult.assignments };
     }
 
-    // Evaluate skill penalties/bonuses based on how aggregated skills compare to the target.
+    // Evaluate skill penalties/bonuses.
     let skillPenalty = 0;
     let skillBonus = 0;
     const exceedFactor = 1;    // Penalty per extra level if exceeding target.
     const notMeetFactor = 5;   // Penalty per missing level if not meeting target.
     const exactBonus = 0.5;    // Bonus per level if exactly meeting target.
-
+    
     Object.keys(targetSkills).forEach(skillId => {
         const target = targetSkills[skillId];
         const current = aggregatedSkills[skillId] || 0;
+        const skillData = skillDatas.find(skill => skill.id === skillId);
         if (current === target) {
             skillBonus += target * exactBonus;
-        } else if (current > target) {
+        } else if (current > skillData.max) {
             skillPenalty += (current - target) * exceedFactor;
         } else { // current < target
             skillPenalty += (target - current) * notMeetFactor;
         }
     });
 
-    // Calculate bonus for matching aid: extra points if multiple pieces share the same aid.
-    let aidCounts = {};
+    // Bonus for matching aid (if multiple pieces share the same aid).
+    const aidCounts = {};
     armorSet.forEach(piece => {
         aidCounts[piece.aid] = (aidCounts[piece.aid] || 0) + 1;
     });
@@ -68,23 +185,18 @@ export function calculateFitness(armorSet, charm, targetSkills) {
         }
     });
 
-    // Total fitness calculation.
     const totalFitness = baseFitness + skillBonus - skillPenalty + aidBonus;
-    return { fitness: totalFitness, currentSkills: aggregatedSkills };
+    return { fitness: totalFitness, currentSkills: aggregatedSkills, decoAssignment: decoResult.assignments };
 }
 
-
-export function simulatedAnnealing(groupedArmors, targetSkills, initSolution, charm, options = {}) {
-    // Default parameters for the algorithm
-    let T = options.initialTemp || 1000;     // initial temperature
-    const T_min = options.finalTemp || 1e-8;   // minimal temperature to stop
-    const alpha = options.coolingFactor || 0.95; // cooling factor per temperature step
+// Updated simulated annealing which now passes decoOptions to calculateFitness.
+export function simulatedAnnealing(groupedArmors, targetSkills, initSolution, charm, decoOptions, options = {}) {
+    const categories = ['1', '2', '3', '4', '5'];
+    let T = options.initialTemp || 1000;
+    const T_min = options.finalTemp || 1e-8;
+    const alpha = options.coolingFactor || 0.95;
     const iterationsPerTemp = options.iterationsPerTemp || 100;
 
-    // Define the categories (assuming they are '1' to '5')
-    const categories = ['1', '2', '3', '4', '5'];
-
-    // Create an initial solution: for each category, pick one random armor
     let currentSolution = initSolution || categories.map(cat => {
         const group = groupedArmors[cat];
         if (!group || group.length === 0) {
@@ -93,74 +205,86 @@ export function simulatedAnnealing(groupedArmors, targetSkills, initSolution, ch
         return group[Math.floor(Math.random() * group.length)];
     });
 
-    // Evaluate the fitness of the initial solution
-    let currentResult = calculateFitness(currentSolution, charm, targetSkills);
+    let currentResult = calculateFitness(currentSolution, charm, decoOptions, targetSkills);
     let currentFitness = currentResult.fitness;
     let bestSolution = currentSolution.slice();
     let bestFitness = currentFitness;
     let bestCurrentSkills = currentResult.currentSkills;
+    let bestDecoAssignment = currentResult.decoAssignment;
 
-    // Main loop of the SA algorithm
     while (T > T_min) {
         for (let i = 0; i < iterationsPerTemp; i++) {
-            // Create a neighbor solution by copying the current one
-            let newSolution = currentSolution.slice();
-
-            // Randomly pick one category to change
+            const newSolution = currentSolution.slice();
             const catIndex = Math.floor(Math.random() * categories.length);
             const cat = categories[catIndex];
             const group = groupedArmors[cat];
-            if (!group || group.length === 0) continue; // should not happen if initial data is complete
-
-            // Replace the current armor in that category with a random alternative
+            if (!group || group.length === 0) continue;
             const candidate = group[Math.floor(Math.random() * group.length)];
             newSolution[catIndex] = candidate;
 
-            // Calculate fitness for the new solution
-            const newResult = calculateFitness(newSolution, charm, targetSkills);
+            const newResult = calculateFitness(newSolution, charm, decoOptions, targetSkills);
             const newFitness = newResult.fitness;
-
-            // Decide whether to accept the new solution
-            if (
-                newFitness > currentFitness ||
-                Math.exp((newFitness - currentFitness) / T) > Math.random()
-            ) {
+            if (newFitness > currentFitness || Math.exp((newFitness - currentFitness) / T) > Math.random()) {
                 currentSolution = newSolution;
                 currentFitness = newFitness;
-                // Update best solution if improved
                 if (newFitness > bestFitness) {
                     bestSolution = newSolution;
                     bestFitness = newFitness;
                     bestCurrentSkills = newResult.currentSkills;
+                    bestDecoAssignment = newResult.decoAssignment;
                 }
             }
         }
-        // Cool down the temperature
         T *= alpha;
     }
 
-    return { bestSolution, bestFitness, bestCurrentSkills };
+    return { bestSolution, bestFitness, bestCurrentSkills, bestDecoAssignment };
 }
 
-export function compareAllCharmCombinations(filteredCharms, groupedArmors, targetSkills, initSolution, options = {}) {
-    // If no charm is provided, run simulatedAnnealing with charm = null.
-    if (!filteredCharms || filteredCharms.length === 0) {
-        return simulatedAnnealing(groupedArmors, targetSkills, initSolution, null, options);
+// Updated function for comparing charm combinations.
+export function compareAllCharmCombinations(filteredCharms, groupedArmors, targetSkills, initSolution, decoOptions, options = {}) {
+    // Function to merge deco assignments (an array of arrays) into the corresponding armor pieces.
+    // Each armor piece gets a new key "ds" that holds its deco assignments.
+    function mergeDecoAssignments(armorSolution, decoAssignment) {
+        return armorSolution.map((armor, index) => ({ ...armor, ds: decoAssignment[index] }));
     }
 
-    let bestSolution = [];
-    let bestFitness = 0;
+    // If no charm is provided, run simulatedAnnealing with charm = null.
+    if (!filteredCharms || filteredCharms.length === 0) {
+        const result = simulatedAnnealing(groupedArmors, targetSkills, initSolution, null, decoOptions, options);
+        // Merge the deco assignments into the armor pieces.
+        const mergedSolution = mergeDecoAssignments(result.bestSolution, result.bestDecoAssignment);
+        return { bestSolution: mergedSolution, bestFitness: result.bestFitness, bestCurrentSkills: result.bestCurrentSkills };
+    }
+
+    let bestMergedSolution = [];
+    let bestFitness = -Infinity;
     let bestCurrentSkills = {};
 
     filteredCharms.forEach(charm => {
-        const result = simulatedAnnealing(groupedArmors, targetSkills, initSolution, charm, options);
+        const result = simulatedAnnealing(groupedArmors, targetSkills, initSolution, charm, decoOptions, options);
         if (result.bestFitness > bestFitness) {
-            bestCurrentSkills = result.bestCurrentSkills;
             bestFitness = result.bestFitness;
-            bestSolution = [...result.bestSolution]; // Ensure it's an array copy
-            bestSolution.push(charm);
+            // Merge the deco assignments into the armor pieces.
+            const mergedSolution = mergeDecoAssignments(result.bestSolution, result.bestDecoAssignment);
+            // Append the charm to the merged armor solution.
+            mergedSolution.push(charm);
+            bestMergedSolution = mergedSolution;
         }
     });
-
-    return { bestSolution, bestFitness, bestCurrentSkills };
+    bestMergedSolution.forEach(piece => {
+      if (piece && piece.sks) {
+        piece.sks.forEach(skill => {
+          const { id: skillId, lv: level } = skill;
+          bestCurrentSkills[skillId] = (bestCurrentSkills[skillId] || 0) + level;
+        });
+        piece.ds?.forEach(deco => {
+          deco?.sks.forEach(skill => {
+            const { id: skillId, lv: level } = skill;
+            bestCurrentSkills[skillId] = (bestCurrentSkills[skillId] || 0) + level;
+          });
+        });
+      }
+    });
+    return { bestSolution: bestMergedSolution, bestFitness, bestCurrentSkills };
 }

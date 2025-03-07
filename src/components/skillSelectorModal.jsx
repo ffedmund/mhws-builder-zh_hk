@@ -70,7 +70,7 @@ class SkillSelector extends React.Component {
   // Render the skill list (filtered by tab and search query)
   renderSkillList() {
     const { activeTab, searchQuery, selectedLevels } = this.state;
-    let filtered = skillDatas.filter((skill) => skill.m === activeTab);
+    let filtered = skillDatas.filter((skill) => skill.m === activeTab && skill.max > 0).sort((a, b) => b.max - a.max);;
 
     if (searchQuery.trim()) {
       filtered = filtered.filter((skill) =>
@@ -174,7 +174,7 @@ class SkillSelector extends React.Component {
                 }}
                 onClick={() => this.handleTabChange("a")}
               >
-                Armor Skills
+                裝備技能
               </div>
               <div
                 style={{
@@ -183,7 +183,7 @@ class SkillSelector extends React.Component {
                 }}
                 onClick={() => this.handleTabChange("w")}
               >
-                Weapon Skills
+                武器技能
               </div>
             </div>
 

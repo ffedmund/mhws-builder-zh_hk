@@ -50,24 +50,16 @@ class CharmDetail extends React.Component {
                 </div>
                 <p style={styles.armorType}>護石</p>
                 <div style={styles.skills}>
-                    <strong>技能:</strong>
-                    {charm.sks && charm.sks.length > 0 ? (
-                        <ul style={styles.skillList}>
-                            {charm.sks.map(sk => {
+                    <strong>技能: </strong>
+                    <a style={styles.skillTitle}>{charm.sks && charm.sks.length > 0
+                        ? charm.sks
+                            .map((sk) => {
                                 const skillData = this.findSkillById(sk.id);
-                                if (!skillData) return null;
-                                return (
-                                    <SkillItem
-                                        key={sk.id}
-                                        skillData={skillData}
-                                        level={sk.lv}
-                                    />
-                                );
-                            })}
-                        </ul>
-                    ) : (
-                        <p>無技能</p>
-                    )}
+                                return skillData ? `${skillData.n} (Lv.${sk.lv})` : null;
+                            })
+                            .filter(Boolean)
+                            .join(", ")
+                        : "無技能"}</a>
                 </div>
             </div>
         );

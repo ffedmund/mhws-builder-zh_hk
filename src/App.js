@@ -3,9 +3,10 @@ import html2canvas from 'html2canvas';
 import SkillSelector from "./components/skillSelectorModal";
 import ArmorDetail from "./components/armorDetail";
 import CharmDetail from "./components/charmDetail";
-import { armors, charms } from "./data/data";
+import { armors, charms, decos } from "./data/data";
 import skillDatas from "./data/cn_skillDatas.json";
 import { buildArmorSet } from "./utils/buildHelpers";
+import SkillItem from "./components/skillItem";
 
 class App extends React.Component {
   constructor(props) {
@@ -16,11 +17,12 @@ class App extends React.Component {
       bestFitness: null,
       bestCurrentSkills: null,
       searchIterations: 1,
-      isLoading: false, // Add isLoading state
+      isLoading: false,
       armorRankLimit: 8,
+      enableDecos: false  // New option: default false, do not allow decos
     };
-    this.armorListRef = React.createRef(); // Create a ref for armorList
-    this.currentSkillsRef = React.createRef(); // Create a ref for currentSkills
+    this.armorListRef = React.createRef();
+    this.currentSkillsRef = React.createRef();
   }
 
   handleSkillConfirm = (selectedSkillsArray) => {
@@ -31,35 +33,38 @@ class App extends React.Component {
     this.setState({ targetSkills });
   };
 
+  handleDecoToggle = (event) => {
+    this.setState({ enableDecos: event.target.checked });
+  };
+
   handleBuild = async () => {
-    // Use async/await
-    const { targetSkills, searchIterations, armorRankLimit } = this.state;
+    const { targetSkills, searchIterations, armorRankLimit, enableDecos } = this.state;
     if (Object.keys(targetSkills).length === 0) {
       alert("請先選擇目標技能");
       return;
     }
 
-    // Set isLoading to true before starting the search
     this.setState({ isLoading: true });
 
     const algorithmOptions = {
       initialTemp: 1000,
       finalTemp: 1e-8,
       coolingFactor: 0.95,
-      iterationsPerTemp: 200,
+      iterationsPerTemp: 100,
     };
 
     let overallBestSet = { bestFitness: -1 };
 
-    // Use a Promise to simulate the asynchronous nature of the search
     try {
       await new Promise((resolve) => {
-        // Wrap the loop in a setTimeout to allow the UI to update
         setTimeout(() => {
           for (let i = 0; i < searchIterations; i++) {
+            // If enableDecos is false, pass an empty array instead of decos.
+            const decoOptions = enableDecos ? decos : [];
             const currentBestSet = buildArmorSet(
               armors,
               charms,
+              decoOptions,
               targetSkills,
               armorRankLimit,
               algorithmOptions
@@ -67,9 +72,10 @@ class App extends React.Component {
 
             if (currentBestSet.bestFitness > overallBestSet.bestFitness) {
               overallBestSet = currentBestSet;
+              console.log("New best set found:", overallBestSet.bestSolution);
             }
           }
-          resolve(); // Resolve the promise when the loop is done
+          resolve();
         }, 0);
       });
 
@@ -80,16 +86,43 @@ class App extends React.Component {
       });
     } catch (error) {
       console.error("Error during build:", error);
-      // Handle errors, e.g., show an error message to the user
       alert("An error occurred during the build process.");
     } finally {
-      // Set isLoading back to false after the search is complete (or fails)
       this.setState({ isLoading: false });
     }
   };
 
   handleSliderChange = (event) => {
     this.setState({ searchIterations: parseInt(event.target.value, 10) });
+  };
+
+  handleEditDeco = (armorIndex, slotIndex, newDecoId) => {
+    const { bestArmorCombination } = this.state;
+    if (!bestArmorCombination || armorIndex < 0 || armorIndex >= bestArmorCombination.length) return;
+
+    const armorPiece = bestArmorCombination[armorIndex];
+    if (!armorPiece) return;
+
+    // Clone decos array
+    const currentDecos = armorPiece.ds ? [...armorPiece.ds] : [];
+    while (currentDecos.length <= slotIndex) currentDecos.push(null); // Ensure array length
+
+    // Find new deco or null if removed
+    const newDeco = newDecoId ? decos.find(d => d.id === newDecoId) : null;
+    currentDecos[slotIndex] = newDeco;
+
+    // Update armor combination
+    const updatedArmor = { ...armorPiece, ds: currentDecos };
+    const newCombination = [...bestArmorCombination];
+    newCombination[armorIndex] = updatedArmor;
+
+    // Recalculate skills
+    const updatedCurrentSkills = this.calculateCurrentSkills(newCombination);
+
+    this.setState({
+      bestArmorCombination: newCombination,
+      bestCurrentSkills: updatedCurrentSkills
+    });
   };
 
   renderCurrentSkills() {
@@ -99,23 +132,28 @@ class App extends React.Component {
     const skillEntries = Object.entries(bestCurrentSkills);
     if (skillEntries.length === 0) return null;
 
+    const sortedSkillEntries = [...skillEntries].sort(([, levelA], [, levelB]) => levelB - levelA);
+
     return (
-      <div style={styles.currentSkillsContainer} ref={this.currentSkillsRef}> {/* Attach ref here */}
+      <div style={styles.currentSkillsContainer} ref={this.currentSkillsRef}>
         <h3 style={styles.currentSkillsTitle}>當前技能</h3>
-        <ul style={styles.currentSkillsList}>
-          {skillEntries.map(([skillId, level]) => {
+        <ul style={styles.skillList}>
+          {sortedSkillEntries.map(([skillId, level]) => {
             const skill = skillDatas.find((s) => s.id === skillId);
-            const skillName = skill ? skill.n : `SkillID: ${skillId}`;
+            if (!skill) return null;
             return (
-              <li key={skillId} style={styles.currentSkillItem}>
-                {skillName} (Lv.{level})
-              </li>
+              <SkillItem
+                key={skillId}
+                skillData={skill}
+                level={level}
+              />
             );
           })}
         </ul>
       </div>
     );
   }
+
 
   calculateCurrentSkills = (armorCombination) => {
     if (!armorCombination || !Array.isArray(armorCombination)) {
@@ -128,23 +166,25 @@ class App extends React.Component {
           const { id: skillId, lv: level } = skill;
           currentSkills[skillId] = (currentSkills[skillId] || 0) + level;
         });
+        piece.ds?.forEach(deco => {
+          deco?.sks.forEach(skill => {
+            const { id: skillId, lv: level } = skill;
+            currentSkills[skillId] = (currentSkills[skillId] || 0) + level;
+          });
+        });
       }
     });
     return currentSkills;
   }
 
-
   handleEditArmor = (index, newArmorId) => {
     const { bestArmorCombination } = this.state;
-    // Ensure we have a valid armor piece (not editing the charm)
     if (!bestArmorCombination || index < 0 || index >= bestArmorCombination.length - 1) return;
 
     const updatedArmor = armors.find((a) => a.id === newArmorId);
     if (updatedArmor) {
       const newCombination = [...bestArmorCombination];
       newCombination[index] = updatedArmor;
-
-      // Recalculate current skills based on the new combination
       const updatedCurrentSkills = this.calculateCurrentSkills(newCombination);
 
       this.setState({
@@ -160,52 +200,43 @@ class App extends React.Component {
 
   handleSaveImage = async () => {
     if (!this.armorListRef.current || !this.currentSkillsRef.current) {
-      return; // Exit if refs are not yet attached
+      return;
     }
 
     const armorListElement = this.armorListRef.current;
     const currentSkillsElement = this.currentSkillsRef.current;
 
     try {
-      const armorListCanvas = await html2canvas(armorListElement, { backgroundColor: null }); // Make background transparent
-      const currentSkillsCanvas = await html2canvas(currentSkillsElement, { backgroundColor: null }); // Make background transparent
+      const armorListCanvas = await html2canvas(armorListElement, { backgroundColor: null });
+      const currentSkillsCanvas = await html2canvas(currentSkillsElement, { backgroundColor: null });
 
-      // Create a single canvas to merge both with black background
       const combinedCanvas = document.createElement('canvas');
       const combinedContext = combinedCanvas.getContext('2d');
 
-      // Padding for black background
       const padding = 20;
       const spacing = 20;
-
-      // Calculate combined canvas dimensions
       const totalHeight = armorListCanvas.height + currentSkillsCanvas.height + spacing + 2 * padding;
       const maxWidth = Math.max(armorListCanvas.width, currentSkillsCanvas.width) + 2 * padding;
       combinedCanvas.width = maxWidth;
       combinedCanvas.height = totalHeight;
 
-      // Fill background with black
       combinedContext.fillStyle = 'black';
       combinedContext.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
-
-      // Draw armorListCanvas and currentSkillsCanvas on top of black background
       combinedContext.drawImage(armorListCanvas, padding, padding);
       combinedContext.drawImage(currentSkillsCanvas, padding, armorListCanvas.height + spacing + padding);
-
 
       const dataURL = combinedCanvas.toDataURL('image/png');
       const downloadLink = document.createElement('a');
       downloadLink.href = dataURL;
-      downloadLink.download = 'armor_skills_setup.png'; // Filename for download
-      document.body.appendChild(downloadLink); // Required for Firefox to work correctly
+      downloadLink.download = 'armor_skills_setup.png';
+      document.body.appendChild(downloadLink);
       downloadLink.click();
-      document.body.removeChild(downloadLink); // Clean up the appended link
+      document.body.removeChild(downloadLink);
     } catch (error) {
       console.error("Error capturing image:", error);
       alert("Failed to save image. Please check the console for details.");
     }
   };
-
 
   render() {
     const {
@@ -213,7 +244,8 @@ class App extends React.Component {
       bestFitness,
       searchIterations,
       isLoading,
-      armorRankLimit
+      armorRankLimit,
+      enableDecos
     } = this.state;
     const rankOptions = [];
     for (let lvl = 1; lvl <= 8; lvl++) {
@@ -229,6 +261,25 @@ class App extends React.Component {
         <div style={styles.controlsContainer}>
           <SkillSelector onConfirm={this.handleSkillConfirm} />
           <div style={styles.inputGroup}>
+            <div style={styles.inputLabel}>裝備最高等級</div>
+            <select
+              style={styles.select}
+              value={armorRankLimit}
+              onChange={this.handleRankLimitChange}
+            >
+              {rankOptions}
+            </select>
+          </div>
+          {/* New option: Enable Decos */}
+          <div style={styles.inputGroup}>
+            <div style={styles.inputLabel}>啟用裝飾</div>
+            <input
+              type="checkbox"
+              checked={enableDecos}
+              onChange={this.handleDecoToggle}
+            />
+          </div>
+          <div style={styles.inputGroup}>
             <div style={styles.inputLabel}>搜索次數:</div>
             <div style={styles.sliderContainer}>
               <input
@@ -243,16 +294,6 @@ class App extends React.Component {
               <span style={styles.sliderValue}>{searchIterations}</span>
             </div>
           </div>
-          <div style={styles.inputGroup}>
-            <div style={styles.inputLabel}>裝備最高等級</div>
-            <select
-              style={styles.select}
-              value={armorRankLimit} // Use armorRankLimit from state
-              onChange={this.handleRankLimitChange} // Add onChange handler
-            >
-              {rankOptions}
-            </select>
-          </div>
           <button
             style={styles.buildButton}
             onClick={this.handleBuild}
@@ -260,7 +301,7 @@ class App extends React.Component {
           >
             {isLoading ? "Loading..." : "Build"}
           </button>
-          {bestArmorCombination && ( // Conditionally render Save button
+          {bestArmorCombination && (
             <button
               style={styles.saveButton}
               onClick={this.handleSaveImage}
@@ -276,12 +317,11 @@ class App extends React.Component {
               推薦裝備組合{" "}
               <span style={styles.fitness}>(Fitness: {bestFitness})</span>
             </h2>
-            <div style={styles.armorList} ref={this.armorListRef}> {/* Attach ref here */}
+            <div style={styles.armorList} ref={this.armorListRef}>
               {Array.isArray(bestArmorCombination) ? (
                 bestArmorCombination.map((piece, index) => {
                   if (!piece) return null;
-                  // Assuming the last piece is a charm which is not editable
-                  if (index === bestArmorCombination.length - 1) {
+                  if (piece.t == null) {
                     return (
                       <div style={styles.card} key={index}>
                         <CharmDetail charmId={piece.id} />
@@ -292,8 +332,11 @@ class App extends React.Component {
                       <div style={styles.card} key={index}>
                         <ArmorDetail
                           armorId={piece.id}
+                          decos={piece.ds}
                           index={index}
                           onEditArmor={this.handleEditArmor}
+                          onEditDeco={this.handleEditDeco}
+                          allDecos={decos} // Pass all decos data
                         />
                       </div>
                     );
@@ -311,7 +354,6 @@ class App extends React.Component {
   }
 }
 
-// Define style variables for consistency
 const DARK_BACKGROUND = "#2c2c2c";
 const MID_BACKGROUND = "#3a3a3a";
 const LIGHT_TEXT = "#d8c7a1";
@@ -442,7 +484,7 @@ const styles = {
   },
   currentSkillsTitle: {
     fontSize: "1rem",
-    marginBottom: "8px",
+    margin: "8px 0px 8px 0px",
   },
   currentSkillsList: {
     listStyleType: "none",
@@ -453,12 +495,12 @@ const styles = {
     marginBottom: "4px",
   },
   select: {
-    width: "150px", // Wider width for select box
+    width: "150px",
     backgroundColor: DARK_BACKGROUND,
     color: LIGHT_TEXT,
     padding: '8px',
     borderRadius: '5px',
-    border: `1px solid ${BORDER_COLOR}`, // Optional: Add border for better visibility
+    border: `1px solid ${BORDER_COLOR}`,
   }
 };
 
