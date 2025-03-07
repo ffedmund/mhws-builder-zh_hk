@@ -106,12 +106,12 @@ const ArmorDetail = ({
 
   const renderSlots = (slots) => {
     if (!slots || slots.length === 0) {
-      return "槽位: 無";
+      return "裝飾品槽: 無";
     }
     const slotsArray = slots.map((slot, i) =>
       decos && decos[i] != null ? `${decos[i].n}` : `[${slot}]`
     );
-    return `槽位: ${slotsArray.join(", ")}`;
+    return `裝飾品槽: ${slotsArray.join(", ")}`;
   };
 
   // Calculate armor skills and deco skills separately
@@ -126,28 +126,28 @@ const ArmorDetail = ({
         .join(", ")
       : "無技能";
 
-  const decoSkillText =
+  const decoSkillText = Object.entries(
     decos && decos.length > 0
-      ? decos
-        .reduce((acc, deco) => {
-          if (deco) {
-            deco.sks.forEach((sk) => {
-              const skillData = findSkillById(sk.id);
-              if (skillData) {
-                acc.push(`${skillData.n} (Lv.${sk.lv})`);
-              }
-            });
-          }
-          return acc;
-        }, [])
-        .join(", ")
-      : "";
+      ? decos.reduce((acc, deco) => {
+        if (deco) {
+          deco.sks.forEach((sk) => {
+            const skillData = findSkillById(sk.id);
+            if (skillData) {
+              acc[skillData.n] = (acc[skillData.n] || 0) + sk.lv;
+            }
+          });
+        }
+        return acc;
+      }, {})
+      : {}
+  ).map(([n, lv]) => `${n} (Lv.${lv})`).join(", ");
+
 
   return (
     <div style={styles.armorCard}>
       <div style={styles.header}>
         <div style={styles.imageAndName}>
-          <img src={imageUrl} alt={translatedName} style={styles.armorImage}/>
+          <img src={imageUrl} alt={translatedName} style={styles.armorImage} />
           {editMode ? (
             <div>
               <select
@@ -175,15 +175,15 @@ const ArmorDetail = ({
         </button>
         {editMode ? (
           <button style={styles.editButton} onClick={() => setEditMode(false)}>
-            Cancel
+            返回
           </button>
         ) : (
           <button style={styles.editButton} onClick={() => setEditMode(true)}>
-            Edit
+            編輯
           </button>
         )}
       </div>
-      <p style={styles.slots}>{editMode?renderEditingSlots(armor.s):renderSlots(armor.s)}</p>
+      <p style={styles.slots}>{editMode ? renderEditingSlots(armor.s) : renderSlots(armor.s)}</p>
       {showStats && (
         <div style={styles.stats}>
           <p style={styles.armorType}>類型: {armorType}</p>

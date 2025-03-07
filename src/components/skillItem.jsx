@@ -23,6 +23,7 @@ class SkillItem extends React.Component {
         </span>
         {expanded && skillData.tl && skillData.tl[level] && (
           <div style={styles.skillDetail}>
+            <p>{skillData.t}</p>
             <p>效果: {skillData.tl[level]}</p>
           </div>
         )}

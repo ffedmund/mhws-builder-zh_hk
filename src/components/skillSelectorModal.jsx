@@ -203,7 +203,7 @@ class SkillSelector extends React.Component {
             {/* Confirm button at the bottom */}
             <div style={styles.confirmButtonContainer}>
               <button style={styles.button} onClick={this.handleConfirmAndCollapse}>
-                Confirm
+                確認
               </button>
             </div>
           </div>

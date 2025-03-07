@@ -272,7 +272,7 @@ class App extends React.Component {
           </div>
           {/* New option: Enable Decos */}
           <div style={styles.inputGroup}>
-            <div style={styles.inputLabel}>啟用裝飾</div>
+            <div style={styles.inputLabel}>啟用裝飾品</div>
             <input
               type="checkbox"
               checked={enableDecos}
@@ -459,6 +459,7 @@ const styles = {
   resultTitle: {
     fontSize: "1.4rem",
     marginBottom: "16px",
+    marginTop: "0px",
   },
   fitness: {
     fontSize: "1rem",
