@@ -109,7 +109,7 @@ const ArmorDetail = ({
       return "槽位: 無";
     }
     const slotsArray = slots.map((slot, i) =>
-      decos && decos[i] != null ? `${decos[i].n}` : `【${slot}】`
+      decos && decos[i] != null ? `${decos[i].n}` : `[${slot}]`
     );
     return `槽位: ${slotsArray.join(", ")}`;
   };
