@@ -52,11 +52,9 @@ export function filterCharmsBySkills(charms, targetSkills) {
 }
 
 export function filterDecosBySkills(decos, targetSkills) {
-    return decos.filter(deco => {
-      return deco.sks.some(
-        (skill) => targetSkills.hasOwnProperty(skill.id)
-      );
-    });
+    return decos.filter(deco => 
+      deco.m === "a" && deco.sks.some(skill => targetSkills.hasOwnProperty(skill.id))
+    );
   }
 
 // Wrap all helper functions and run the charm-combination algorithm.
