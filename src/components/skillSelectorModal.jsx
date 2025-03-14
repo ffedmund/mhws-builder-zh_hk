@@ -3,52 +3,43 @@ import skillDatas from "../data/cn_skillDatas.json";
 import { groups, series } from "../data/data";
 
 class SkillSelector extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = {
-            // Controls whether the search panel is expanded
-            expanded: false,
-            // Which tab is active: "a" (armor) or "w" (weapon) or "s" (set)
-            activeTab: "a",
-            // Search query for filtering the skill list
-            searchQuery: "",
-            // A map of skillId -> chosen level (0..max)
-            selectedLevels: {},
-            // Store precomputed IDs here
-            allIds: []
-        };
-    }
-
-    // Toggle the panel open/close
-    toggleExpand = () => {
-        this.setState((prev) => ({ expanded: !prev.expanded }));
-    };
-
-    // Switch between armor ("a") and weapon ("w") skills
-    handleTabChange = (tab) => {
-        this.setState({ activeTab: tab, searchQuery: "" });
-    };
-
-    // Update the search query
-    handleSearchChange = (e) => {
-        this.setState({ searchQuery: e.target.value });
-    };
-
-    // Reset all selected levels to 0
-    handleReset = () => {
-        this.setState({ selectedLevels: {} });
+    state = {
+        // Controls whether the search panel is expanded
+        expanded: false,
+        // Which tab is active: "a" (armor) or "w" (weapon) or "s" (set)
+        activeTab: "a",
+        // Search query for filtering the skill list
+        searchQuery: "",
+        // A map of skillId -> chosen level (0..max)
+        selectedLevels: {},
+        // Store precomputed IDs here
+        allIds: [],
     };
 
     componentDidMount() {
-        const allIds = [...groups, ...series].flatMap(g => g.s.flatMap(s => String(s.ids)));
+        // Precompute allIds from groups and series
+        const allIds = [...groups, ...series].flatMap((g) =>
+            g.s.flatMap((s) => String(s.ids))
+        );
         this.setState({ allIds });
     }
 
-    // Confirm selection: pass the chosen skills to parent, if provided
+    // Toggle the panel open/close
+    toggleExpand = () =>
+        this.setState((prev) => ({ expanded: !prev.expanded }));
+
+    // Switch between tabs and clear search
+    handleTabChange = (tab) => this.setState({ activeTab: tab, searchQuery: "" });
+
+    // Update the search query
+    handleSearchChange = (e) => this.setState({ searchQuery: e.target.value });
+
+    // Reset all selected levels
+    handleReset = () => this.setState({ selectedLevels: {} });
+
+    // Confirm selection: pass chosen skills to the parent if provided
     handleConfirm = () => {
-        const { selectedLevels } = this.state;
-        // Build an array of { skillId, level } for each skill with level > 0
-        const chosen = Object.entries(selectedLevels)
+        const chosen = Object.entries(this.state.selectedLevels)
             .filter(([, lvl]) => lvl > 0)
             .map(([skillId, lvl]) => ({ skillId, level: lvl }));
         if (this.props.onConfirm) {
@@ -62,53 +53,87 @@ class SkillSelector extends React.Component {
         this.toggleExpand();
     };
 
-    // When user changes the level of a skill
+    // Update level for a given skill
     handleLevelChange = (skillId, newLevel) => {
         this.setState((prev) => {
             const updated = { ...prev.selectedLevels };
-            if (newLevel === 0) {
-                delete updated[skillId];
-            } else {
-                updated[skillId] = newLevel;
-            }
+            newLevel === 0 ? delete updated[skillId] : (updated[skillId] = newLevel);
             return { selectedLevels: updated };
         });
     };
 
-    // Add a new handler for toggling set skills
+    // Toggle set skill selection and handle related skills
     handleSetSkillToggle = (skillId) => {
+        const skill = skillDatas.find((skill) => skill.id === skillId);
+        if (!skill) {
+            console.warn(`Skill with id ${skillId} not found`);
+            return;
+        }
+
+        const { n: skillName } = skill;
+        console.log("Toggling skill:", skillName);
+
+        // Check if the skill name ends with Unicode "Ⅰ" or "Ⅱ"
+        const isCaseII = skillName.endsWith("Ⅱ"); // U+2161
+        const isCaseI = !isCaseII && skillName.endsWith("Ⅰ"); // U+2160
+
         this.setState((prevState) => {
             const updated = { ...prevState.selectedLevels };
+
             if (updated[skillId]) {
                 // Deselect if already selected
                 delete updated[skillId];
             } else {
-                // Mark as selected; for set skills, using 1 as a flag
-                updated[skillId] = 1;
+                // Select the skill with 99 as a flag
+                updated[skillId] = 99;
+                const numericId = parseInt(skillId, 10);
+                if (!isNaN(numericId)) {
+                    console.log("Enable skill:", skillId, isCaseI, isCaseII);
+                    if (isCaseII && updated[String(numericId - 1)]) {
+                        delete updated[String(numericId - 1)];
+                        console.log("Disable skill:", String(numericId - 1));
+                    } else if (isCaseI && updated[String(numericId + 1)]) {
+                        delete updated[String(numericId + 1)];
+                        console.log("Disable skill:", String(numericId + 1));
+                    }
+                } else {
+                    console.warn(
+                        `Skill id ${skillId} is not numeric, cannot toggle related skills`
+                    );
+                }
             }
             return { selectedLevels: updated };
         });
     };
 
-    renderSkillList() {
+    // Render the list of skills based on the active tab and search query
+    renderSkillList = () => {
         const { activeTab, searchQuery, selectedLevels, allIds } = this.state;
-        let filtered =
-            activeTab === "s"
-                ? skillDatas.filter((skill) => allIds.includes(skill.id))
-                : skillDatas
-                    .filter((skill) => skill.m === activeTab && !allIds.includes(skill.id))
-                    .sort((a, b) => b.max - a.max);
+        let filteredSkills = [];
+
+        if (activeTab === "s") {
+            filteredSkills = skillDatas.filter((skill) =>
+                allIds.includes(skill.id)
+            );
+        } else {
+            filteredSkills = skillDatas
+                .filter(
+                    (skill) => skill.m === activeTab && !allIds.includes(skill.id)
+                )
+                .sort((a, b) => b.max - a.max);
+        }
 
         if (searchQuery.trim()) {
-            filtered = filtered.filter((skill) =>
+            filteredSkills = filteredSkills.filter((skill) =>
                 skill.n.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
+        // Render differently for set skills and others
         if (activeTab === "s") {
             return (
                 <ul style={styles.skillList}>
-                    {filtered.map((skill) => {
+                    {filteredSkills.map((skill) => {
                         const isSelected = !!selectedLevels[skill.id];
                         return (
                             <li
@@ -119,23 +144,22 @@ class SkillSelector extends React.Component {
                                     padding: "8px",
                                     display: "flex",
                                     alignItems: "center",
-                                    justifyContent: "space-between"
+                                    justifyContent: "space-between",
                                 }}
                             >
                                 <div style={styles.skillName}>{skill.n}</div>
-                                {/* Toggle switch using abstracted styles */}
                                 <div
                                     style={{
                                         ...styles.toggleSwitch,
                                         backgroundColor: isSelected
                                             ? styles.toggleSwitchActiveColor
-                                            : styles.toggleSwitchInactiveColor
+                                            : styles.toggleSwitchInactiveColor,
                                     }}
                                 >
                                     <div
                                         style={{
                                             ...styles.toggleKnob,
-                                            left: isSelected ? "20px" : "1px"
+                                            left: isSelected ? "20px" : "1px",
                                         }}
                                     ></div>
                                 </div>
@@ -146,19 +170,19 @@ class SkillSelector extends React.Component {
             );
         }
 
-        // For other tabs, use the dropdown for selecting levels.
+        // For non-set skills: use a dropdown to select levels.
         return (
             <ul style={styles.skillList}>
-                {filtered.map((skill) => {
+                {filteredSkills.map((skill) => {
                     const currentLevel = selectedLevels[skill.id] || 0;
-                    const levelOptions = [];
-                    for (let lvl = 0; lvl <= skill.max; lvl++) {
-                        levelOptions.push(
+                    const levelOptions = Array.from(
+                        { length: skill.max + 1 },
+                        (_, lvl) => (
                             <option key={lvl} value={lvl}>
                                 {lvl}
                             </option>
-                        );
-                    }
+                        )
+                    );
                     return (
                         <li key={skill.id} style={styles.skillRow}>
                             <div style={styles.skillName}>{skill.n}</div>
@@ -167,7 +191,10 @@ class SkillSelector extends React.Component {
                                     style={styles.select}
                                     value={currentLevel}
                                     onChange={(e) =>
-                                        this.handleLevelChange(skill.id, parseInt(e.target.value))
+                                        this.handleLevelChange(
+                                            skill.id,
+                                            parseInt(e.target.value, 10)
+                                        )
                                     }
                                 >
                                     {levelOptions}
@@ -178,18 +205,20 @@ class SkillSelector extends React.Component {
                 })}
             </ul>
         );
-    }
-
+    };
 
     render() {
-        const { expanded, activeTab, searchQuery, selectedLevels } = this.state;
+        const { expanded, searchQuery, selectedLevels, allIds, activeTab } =
+            this.state;
 
-        // Build a comma-separated string of selected skill names/levels for the collapsed view
+        // Create a comma-separated list of selected skill texts
         const selectedSkillsText = Object.entries(selectedLevels)
             .filter(([, lvl]) => lvl > 0)
             .map(([id, lvl]) => {
                 const skill = skillDatas.find((s) => s.id === id);
-                return skill ? `${skill.n}(Lv.${lvl})` : `SkillID ${id}(Lv.${lvl})`;
+                return skill
+                    ? `${skill.n}${allIds.includes(id) ? "" : `(Lv.${lvl})`}`
+                    : `SkillID ${id}${lvl ? `(Lv.${lvl})` : ""}`;
             });
 
         return (
@@ -199,16 +228,15 @@ class SkillSelector extends React.Component {
                 {/* Collapsed view */}
                 {!expanded && (
                     <div style={styles.collapsedDisplay}>
-                        {/* Step 2: Render as a list */}
-                        <ul style={styles.selectedSkillList}> {/* Added ul and style */}
-                            {selectedSkillsText.length > 0 ? ( // Check if there are selected skills
-                                selectedSkillsText.map((skillText, index) => ( // Map through the array
-                                    <li key={index} style={styles.selectedSkillListItem}> {/* Added li and style, using index as key for now */}
+                        <ul style={styles.selectedSkillList}>
+                            {selectedSkillsText.length > 0 ? (
+                                selectedSkillsText.map((skillText, index) => (
+                                    <li key={index} style={styles.selectedSkillListItem}>
                                         {skillText}
                                     </li>
                                 ))
                             ) : (
-                                <li style={styles.selectedSkillListItem}> {/* Added li and style for placeholder */}
+                                <li style={styles.selectedSkillListItem}>
                                     請選擇技能...
                                 </li>
                             )}
@@ -227,7 +255,6 @@ class SkillSelector extends React.Component {
                 {/* Expanded panel */}
                 {expanded && (
                     <div style={styles.panel}>
-                        {/* Instructions (optional) */}
                         <div style={styles.instructions}>
                             請選擇要發動的技能或對應套索：
                             <br />
@@ -239,25 +266,27 @@ class SkillSelector extends React.Component {
                             <div
                                 style={{
                                     ...styles.tab,
-                                    ...(activeTab === "a" ? styles.tabActive : {})
+                                    ...(activeTab === "a" ? styles.tabActive : {}),
                                 }}
                                 onClick={() => this.handleTabChange("a")}
                             >
                                 裝備技能
                             </div>
-                            {/* <div
-                style={{
-                  ...styles.tab,
-                  ...(activeTab === "w" ? styles.tabActive : {})
-                }}
-                onClick={() => this.handleTabChange("w")}
-              >
-                武器技能
-              </div> */}
+                            {/*
+                <div
+                  style={{
+                    ...styles.tab,
+                    ...(activeTab === "w" ? styles.tabActive : {}),
+                  }}
+                  onClick={() => this.handleTabChange("w")}
+                >
+                  武器技能
+                </div>
+                */}
                             <div
                                 style={{
                                     ...styles.tab,
-                                    ...(activeTab === "s" ? styles.tabActive : {})
+                                    ...(activeTab === "s" ? styles.tabActive : {}),
                                 }}
                                 onClick={() => this.handleTabChange("s")}
                             >
@@ -278,9 +307,12 @@ class SkillSelector extends React.Component {
                         {/* Skill list */}
                         <div style={styles.listContainer}>{this.renderSkillList()}</div>
 
-                        {/* Confirm button at the bottom */}
+                        {/* Confirm button */}
                         <div style={styles.confirmButtonContainer}>
-                            <button style={styles.button} onClick={this.handleConfirmAndCollapse}>
+                            <button
+                                style={styles.button}
+                                onClick={this.handleConfirmAndCollapse}
+                            >
                                 確認
                             </button>
                         </div>
