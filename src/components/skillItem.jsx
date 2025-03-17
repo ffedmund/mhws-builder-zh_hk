@@ -18,8 +18,8 @@ class SkillItem extends React.Component {
 
     return (
       <li style={styles.skillItem} onClick={this.toggleExpand}>
-        <span style={level === skillData.max? styles.maxSkillHeader:styles.skillHeader}>
-          {skillData.n} (Lv.{level})
+        <span style={(level === skillData.max || level === 99)? styles.maxSkillHeader:styles.skillHeader}>
+          {skillData.n} {(level === 99?"":`(Lv.${level})`)}
         </span>
         {expanded && skillData.tl && skillData.tl[level] && (
           <div style={styles.skillDetail}>

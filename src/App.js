@@ -19,7 +19,8 @@ class App extends React.Component {
       searchIterations: 1,
       isLoading: false,
       armorRankLimit: 8,
-      enableDecos: false  // New option: default false, do not allow decos
+      enableDecos: false,  // New option: default false, do not allow decos
+      enableCharm: true
     };
     this.armorListRef = React.createRef();
     this.currentSkillsRef = React.createRef();
@@ -37,8 +38,12 @@ class App extends React.Component {
     this.setState({ enableDecos: event.target.checked });
   };
 
+  handleCharmToggle = (event) => {
+    this.setState({ enableCharm: event.target.checked });
+  };
+
   handleBuild = async () => {
-    const { targetSkills, searchIterations, armorRankLimit, enableDecos } = this.state;
+    const { targetSkills, searchIterations, armorRankLimit, enableDecos, enableCharm } = this.state;
     if (Object.keys(targetSkills).length === 0) {
       alert("請先選擇目標技能");
       return;
@@ -61,9 +66,10 @@ class App extends React.Component {
           for (let i = 0; i < searchIterations; i++) {
             // If enableDecos is false, pass an empty array instead of decos.
             const decoOptions = enableDecos ? decos : [];
+            const charmOptions = enableCharm ? charms : [];
             const currentBestSet = buildArmorSet(
               armors,
-              charms,
+              charmOptions,
               decoOptions,
               targetSkills,
               armorRankLimit,
@@ -245,7 +251,8 @@ class App extends React.Component {
       searchIterations,
       isLoading,
       armorRankLimit,
-      enableDecos
+      enableDecos,
+      enableCharm,
     } = this.state;
     const rankOptions = [];
     for (let lvl = 1; lvl <= 8; lvl++) {
@@ -277,6 +284,14 @@ class App extends React.Component {
               type="checkbox"
               checked={enableDecos}
               onChange={this.handleDecoToggle}
+            />
+          </div>
+          <div style={styles.inputGroup}>
+            <div style={styles.inputLabel}>啟用護石</div>
+            <input
+              type="checkbox"
+              checked={enableCharm}
+              onChange={this.handleCharmToggle}
             />
           </div>
           <div style={styles.inputGroup}>

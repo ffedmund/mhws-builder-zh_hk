@@ -71,7 +71,7 @@ class SkillSelector extends React.Component {
         }
 
         const { n: skillName } = skill;
-        console.log("Toggling skill:", skillName);
+        // console.log("Toggling skill:", skillName);
 
         // Check if the skill name ends with Unicode "Ⅰ" or "Ⅱ"
         const isCaseII = skillName.endsWith("Ⅱ"); // U+2161
@@ -88,7 +88,7 @@ class SkillSelector extends React.Component {
                 updated[skillId] = 99;
                 const numericId = parseInt(skillId, 10);
                 if (!isNaN(numericId)) {
-                    console.log("Enable skill:", skillId, isCaseI, isCaseII);
+                    // console.log("Enable skill:", skillId, isCaseI, isCaseII);
                     if (isCaseII && updated[String(numericId - 1)]) {
                         delete updated[String(numericId - 1)];
                         console.log("Disable skill:", String(numericId - 1));
